@@ -86,6 +86,7 @@ export function ClientTable({ clients, isLoading, sortBy, sortOrder, onSort }: C
 
   return (
     <>
+      <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -145,6 +146,8 @@ export function ClientTable({ clients, isLoading, sortBy, sortOrder, onSort }: C
           })}
         </TableBody>
       </Table>
+
+      </div>
 
       {editingClient && (
         <ClientForm

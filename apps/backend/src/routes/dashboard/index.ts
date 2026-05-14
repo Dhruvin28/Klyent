@@ -9,68 +9,55 @@ export default async function dashboardRoutes(app: FastifyInstance) {
   app.get('/stats', async (request, reply) => {
     const userId = request.user.sub
 
-    // Run all aggregations in parallel for performance
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+
+    // Run all queries in parallel
     const [
       clientCounts,
       allClients,
       totalRevenueAgg,
-      monthlyRevenue,
-      clientGrowth,
+      recentPayments,
+      recentClients,
       recentActivity,
     ] = await Promise.all([
-      // Client counts by status
       prisma.client.groupBy({
         by: ['status'],
         where: { userId },
         _count: true,
       }),
 
-      // All clients with their payment sums (for pending calc)
       prisma.client.findMany({
         where: { userId, status: { in: ['ACTIVE', 'ON_HOLD'] } },
         select: {
           totalDealAmount: true,
-          _count: { select: { payments: true } },
-          payments: {
-            select: { amount: true },
-          },
+          payments: { select: { amount: true } },
         },
       }),
 
-      // Total revenue across all clients
       prisma.payment.aggregate({
         where: { client: { userId } },
         _sum: { amount: true },
       }),
 
-      // Monthly revenue - last 12 months
-      prisma.$queryRaw<Array<{ month: number; year: number; total: number }>>`
-        SELECT
-          EXTRACT(MONTH FROM p.date)::int AS month,
-          EXTRACT(YEAR FROM p.date)::int AS year,
-          SUM(p.amount)::float AS total
-        FROM "Payment" p
-        JOIN "Client" c ON c.id = p."clientId"
-        WHERE c."userId" = ${userId}
-          AND p.date >= NOW() - INTERVAL '12 months'
-        GROUP BY year, month
-        ORDER BY year ASC, month ASC
-      `,
+      // Payments in last 12 months for monthly revenue chart
+      prisma.payment.findMany({
+        where: {
+          client: { userId },
+          date: { gte: twelveMonthsAgo },
+        },
+        select: { date: true, amount: true },
+      }),
 
-      // Client growth - last 12 months
-      prisma.$queryRaw<Array<{ month: number; year: number; count: number }>>`
-        SELECT
-          EXTRACT(MONTH FROM "createdAt")::int AS month,
-          EXTRACT(YEAR FROM "createdAt")::int AS year,
-          COUNT(*)::int AS count
-        FROM "Client"
-        WHERE "userId" = ${userId}
-          AND "createdAt" >= NOW() - INTERVAL '12 months'
-        GROUP BY year, month
-        ORDER BY year ASC, month ASC
-      `,
+      // Clients created in last 12 months for growth chart
+      prisma.client.findMany({
+        where: {
+          userId,
+          createdAt: { gte: twelveMonthsAgo },
+        },
+        select: { createdAt: true },
+      }),
 
-      // Recent activity logs
       prisma.activityLog.findMany({
         where: { client: { userId } },
         take: 10,
@@ -82,13 +69,39 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       }),
     ])
 
+    // Aggregate monthly revenue in JS
+    const revenueMap = new Map<string, { month: number; year: number; total: number }>()
+    for (const p of recentPayments) {
+      const d = new Date(p.date)
+      const month = d.getMonth() + 1
+      const year = d.getFullYear()
+      const key = `${year}-${month}`
+      const entry = revenueMap.get(key) ?? { month, year, total: 0 }
+      entry.total = Number((entry.total + Number(p.amount)).toFixed(2))
+      revenueMap.set(key, entry)
+    }
+
+    // Aggregate client growth in JS
+    const growthMap = new Map<string, { month: number; year: number; count: number }>()
+    for (const c of recentClients) {
+      const d = new Date(c.createdAt)
+      const month = d.getMonth() + 1
+      const year = d.getFullYear()
+      const key = `${year}-${month}`
+      const entry = growthMap.get(key) ?? { month, year, count: 0 }
+      entry.count += 1
+      growthMap.set(key, entry)
+    }
+
+    const sortByYearMonth = (a: { year: number; month: number }, b: { year: number; month: number }) =>
+      a.year !== b.year ? a.year - b.year : a.month - b.month
+
     // Calculate totals
     const totalClients = clientCounts.reduce((sum, g) => sum + g._count, 0)
     const activeClients = clientCounts.find((g) => g.status === 'ACTIVE')?._count ?? 0
     const completedClients = clientCounts.find((g) => g.status === 'COMPLETED')?._count ?? 0
     const onHoldClients = clientCounts.find((g) => g.status === 'ON_HOLD')?._count ?? 0
 
-    // Pending payments = sum(totalDealAmount - totalPaid) for active/on-hold clients
     const pendingPayments = allClients.reduce((sum, client) => {
       const totalPaid = client.payments.reduce((s, p) => s + Number(p.amount), 0)
       const remaining = Number(client.totalDealAmount) - totalPaid
@@ -105,16 +118,8 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         completedClients,
         onHoldClients,
         pendingPayments,
-        monthlyRevenue: monthlyRevenue.map((r) => ({
-          month: r.month,
-          year: r.year,
-          total: Number(r.total),
-        })),
-        clientGrowth: clientGrowth.map((r) => ({
-          month: r.month,
-          year: r.year,
-          count: Number(r.count),
-        })),
+        monthlyRevenue: Array.from(revenueMap.values()).sort(sortByYearMonth),
+        clientGrowth: Array.from(growthMap.values()).sort(sortByYearMonth),
         recentActivity,
       },
     })

@@ -58,12 +58,12 @@ export function PaymentsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">All Payments</h2>
           <p className="text-sm text-muted-foreground">Track payments across all clients</p>
         </div>
-        <Button onClick={() => setAddOpen(true)}>
+        <Button onClick={() => setAddOpen(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Add Payment
         </Button>
@@ -71,10 +71,10 @@ export function PaymentsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-end">
-        <div className="space-y-1">
+        <div className="space-y-1 w-full sm:w-auto">
           <p className="text-xs text-muted-foreground font-medium">Client</p>
           <Select value={clientId || 'all'} onValueChange={(v) => { setClientId(v === 'all' ? '' : v); setPage(1) }}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="All clients" />
             </SelectTrigger>
             <SelectContent>
@@ -86,10 +86,10 @@ export function PaymentsPage() {
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 w-full sm:w-auto">
           <p className="text-xs text-muted-foreground font-medium">Method</p>
           <Select value={method || 'all'} onValueChange={(v) => { setMethod(v === 'all' ? '' : v); setPage(1) }}>
-            <SelectTrigger className="w-36">
+            <SelectTrigger className="w-full sm:w-36">
               <SelectValue placeholder="All methods" />
             </SelectTrigger>
             <SelectContent>
@@ -101,23 +101,23 @@ export function PaymentsPage() {
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 w-full sm:w-auto">
           <p className="text-xs text-muted-foreground font-medium">From</p>
           <Input
             type="date"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
-            className="w-40"
+            className="w-full sm:w-40"
           />
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 w-full sm:w-auto">
           <p className="text-xs text-muted-foreground font-medium">To</p>
           <Input
             type="date"
             value={endDate}
             onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
-            className="w-40"
+            className="w-full sm:w-40"
           />
         </div>
 
@@ -170,6 +170,7 @@ export function PaymentsPage() {
         />
       ) : (
         <>
+          <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -204,6 +205,8 @@ export function PaymentsPage() {
               ))}
             </TableBody>
           </Table>
+
+          </div>
 
           {/* Pagination */}
           {totalPages > 1 && (

@@ -57,8 +57,8 @@ export default async function clientRoutes(app: FastifyInstance) {
       ...(status && { status }),
       ...(search && {
         OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
+          { name: { contains: search } },
+          { email: { contains: search } },
         ],
       }),
     }

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -33,8 +33,8 @@ model Client {
   email              String?
   phone              String?
   address            String?
-  projectDescription String?
-  totalDealAmount    Decimal       @default(0)
+  projectDescription String?  @db.Text
+  totalDealAmount    Decimal       @default(0) @db.Decimal(15, 2)
   status             ClientStatus  @default(ACTIVE)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -57,12 +57,12 @@ enum ClientStatus {
 
 model Payment {
   id        String        @id @default(cuid())
-  amount    Decimal
+  amount    Decimal  @db.Decimal(15, 2)
   method    PaymentMethod
   date      DateTime
-  notes     String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   clientId  String
   client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   userId    String
@@ -79,16 +79,17 @@ enum PaymentMethod {
 }
 
 model File {
-  id         String        @id @default(cuid())
-  name       String
-  mimeType   String
-  clientId   String
-  client     Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  versions   FileVersion[]
-  comments   Comment[]
-  shareToken String?       @unique @default(cuid())
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id          String        @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  mimeType    String
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  versions    FileVersion[]
+  comments    Comment[]
+  shareToken  String?       @unique @default(cuid())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([clientId])
 }
@@ -96,7 +97,7 @@ model File {
 model FileVersion {
   id            String   @id @default(cuid())
   versionNumber Int
-  s3Key         String
+  s3Key         String   @db.VarChar(768)
   s3Bucket      String
   size          Int
   isActive      Boolean  @default(true)
@@ -112,7 +113,7 @@ model FileVersion {
 
 model Comment {
   id        String   @id @default(cuid())
-  content   String
+  content   String   @db.Text
   fileId    String
   file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
   userId    String

@@ -12,8 +12,8 @@ export function useFiles(clientId: string) {
 export function useUploadFile(clientId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ file, onProgress }: { file: globalThis.File; onProgress?: (p: number) => void }) =>
-      filesApi.uploadFile(clientId, file, onProgress),
+    mutationFn: ({ file, name, description, onProgress }: { file: globalThis.File; name?: string; description?: string; onProgress?: (p: number) => void }) =>
+      filesApi.uploadFile(clientId, file, { name, description, onProgress }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['files', clientId] })
       qc.invalidateQueries({ queryKey: ['clients', clientId] })

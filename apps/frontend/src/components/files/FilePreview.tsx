@@ -30,7 +30,7 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
     if (file && open) {
       setLoadingPreview(true)
       filesApi.getFilePreview(file.id)
-        .then((res) => setPreviewUrl(res.url))
+        .then((url) => setPreviewUrl(url))
         .catch(() => setPreviewUrl(null))
         .finally(() => setLoadingPreview(false))
     } else {
@@ -41,7 +41,7 @@ export function FilePreview({ file, open, onOpenChange }: FilePreviewProps) {
   const handleDownload = async () => {
     if (!file) return
     try {
-      const { url } = await filesApi.getFileDownloadUrl(file.id)
+      const url = await filesApi.getFileDownloadUrl(file.id)
       const link = document.createElement('a')
       link.href = url
       link.download = file.name

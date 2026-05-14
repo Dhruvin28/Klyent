@@ -10,17 +10,20 @@ export const filesApi = {
   uploadFile: async (
     clientId: string,
     file: globalThis.File,
-    onProgress?: (progress: number) => void
+    options?: { name?: string; description?: string; onProgress?: (progress: number) => void }
   ): Promise<File> => {
     const formData = new FormData()
-    formData.append('file', file)
     formData.append('clientId', clientId)
+    if (options?.name) formData.append('name', options.name)
+    if (options?.description) formData.append('description', options.description)
+    formData.append('file', file)
+    const onProgress = options?.onProgress
     const res = await api.post<{ data: File }>('/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
-          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-          onProgress(percent)
+          const pct = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(pct)
         }
       },
     })
@@ -38,8 +41,8 @@ export const filesApi = {
   },
 
   getFilePreview: async (id: string): Promise<string> => {
-    const res = await api.get<{ url: string }>(`/files/${id}/preview`)
-    return res.data.url
+    const res = await api.get<{ data: { url: string } }>(`/files/${id}/preview`)
+    return res.data.data.url
   },
 
   deleteFile: async (id: string): Promise<void> => {
@@ -47,8 +50,30 @@ export const filesApi = {
   },
 
   getSharedFile: async (token: string): Promise<{ file: File; previewUrl: string }> => {
-    const res = await api.get<{ data: { file: File; previewUrl: string } }>(`/files/share/${token}`)
-    return res.data.data
+    const res = await api.get<{ data: {
+      id: string; name: string; mimeType: string; clientName: string
+      versionNumber: number; size: number; createdAt: string; updatedAt: string
+      downloadUrl: string; expiresIn: number
+    } }>(`/files/share/${token}`)
+    const d = res.data.data
+    return {
+      file: {
+        id: d.id,
+        name: d.name,
+        mimeType: d.mimeType,
+        clientId: '',
+        shareToken: token,
+        createdAt: d.createdAt,
+        latestVersion: {
+          id: '',
+          versionNumber: d.versionNumber,
+          size: d.size,
+          isActive: true,
+          createdAt: d.createdAt,
+        },
+      },
+      previewUrl: d.downloadUrl,
+    }
   },
 
   getComments: async (fileId: string): Promise<Comment[]> => {

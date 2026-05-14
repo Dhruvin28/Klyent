@@ -31,7 +31,7 @@ export function FilesPage() {
             value={selectedClientId || 'none'}
             onValueChange={(v) => setSelectedClientId(v === 'none' ? '' : v)}
           >
-            <SelectTrigger className="w-64">
+            <SelectTrigger className="w-full sm:w-64">
               <SelectValue placeholder="Select a client" />
             </SelectTrigger>
             <SelectContent>

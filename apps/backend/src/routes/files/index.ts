@@ -88,6 +88,11 @@ export default async function fileRoutes(app: FastifyInstance) {
 
     const clientId = clientIdField.value
 
+    const customNameField = data.fields['name'] as { value: string } | undefined
+    const descriptionField = data.fields['description'] as { value: string } | undefined
+    const customName = customNameField?.value?.trim() || undefined
+    const description = descriptionField?.value?.trim() || undefined
+
     // Verify ownership
     const client = await prisma.client.findUnique({
       where: { id: clientId },
@@ -113,7 +118,7 @@ export default async function fileRoutes(app: FastifyInstance) {
       })
     }
 
-    const filename = data.filename
+    const filename = customName || data.filename
 
     // Check if file with same name exists for this client
     let existingFile = await prisma.file.findFirst({
@@ -135,6 +140,7 @@ export default async function fileRoutes(app: FastifyInstance) {
       const newFile = await prisma.file.create({
         data: {
           name: filename,
+          description,
           mimeType,
           clientId,
         },
@@ -200,10 +206,13 @@ export default async function fileRoutes(app: FastifyInstance) {
       },
     })
 
-    // Update file updatedAt
+    // Update file updatedAt (and description if provided)
     await prisma.file.update({
       where: { id: fileId },
-      data: { updatedAt: new Date() },
+      data: {
+        updatedAt: new Date(),
+        ...(description !== undefined && { description }),
+      },
     })
 
     // Log activity

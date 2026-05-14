@@ -51,6 +51,7 @@ export interface Payment {
 export interface File {
   id: string
   name: string
+  description?: string | null
   mimeType: string
   clientId: string
   shareToken?: string

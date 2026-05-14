@@ -5,6 +5,7 @@ import { ClientsPage } from '@/pages/ClientsPage'
 import { ClientDetailPage } from '@/pages/ClientDetailPage'
 import { PaymentsPage } from '@/pages/PaymentsPage'
 import { FilesPage } from '@/pages/FilesPage'
+import { ProfilePage } from '@/pages/ProfilePage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { SharePage } from '@/pages/SharePage'
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/clients/:id" element={<ClientDetailPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/files" element={<FilesPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         {/* Catch-all redirect */}

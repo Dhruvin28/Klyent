@@ -60,29 +60,27 @@ export function ClientsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <SearchInput
-            value={search}
-            onChange={handleSearchChange}
-            placeholder="Search clients..."
-            className="w-64"
-          />
-        </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <SearchInput
+          value={search}
+          onChange={handleSearchChange}
+          placeholder="Search clients..."
+          className="w-full sm:w-64"
+        />
+        <Button onClick={() => setIsFormOpen(true)} className="gap-2 w-full sm:w-auto">
           <UserPlus className="h-4 w-4" />
           Add Client
         </Button>
       </div>
 
-      {/* Status tabs */}
-      <div className="flex gap-1 border-b">
+      {/* Status tabs — scrollable on mobile */}
+      <div className="flex gap-1 border-b overflow-x-auto scrollbar-none">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
             onClick={() => handleStatusFilter(tab.value)}
             className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap shrink-0',
               statusFilter === tab.value
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'

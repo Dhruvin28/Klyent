@@ -1,17 +1,18 @@
 # Klyent
 
-Production-ready SaaS for client management, payment tracking, and document collaboration.
+Klyent is a client management SaaS platform for managing clients, tracking payments, collaborating on documents, and viewing business analytics. It uses a React + Vite frontend, a Fastify + TypeScript backend, PostgreSQL, Prisma, and S3-compatible file storage.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, TypeScript, TailwindCSS, shadcn/ui |
-| State | Zustand (auth), React Query (server state) |
+| Frontend | React 18, Vite, TypeScript, TailwindCSS |
+| UI | shadcn/ui, Radix UI primitives |
+| State | Zustand, React Query |
 | Backend | Node.js, Fastify, TypeScript |
 | Database | PostgreSQL, Prisma ORM |
-| File Storage | S3-compatible (MinIO for local dev, AWS S3 for prod) |
-| Auth | JWT (email/password) |
+| File Storage | MinIO (local), AWS S3-compatible APIs |
+| Auth | JWT with email/password |
 | Charts | Recharts |
 
 ## Project Structure
@@ -20,104 +21,237 @@ Production-ready SaaS for client management, payment tracking, and document coll
 klyent/
 ├── apps/
 │   ├── backend/          # Fastify API server
-│   │   ├── prisma/       # Schema + seed script
-│   │   └── src/
+│   │   ├── prisma/       # Prisma schema, migrations, seed script
+│   │   └── src/          # Backend source code
 │   │       ├── routes/   # auth, clients, payments, files, dashboard, activity
 │   │       ├── lib/      # Prisma client, S3 client
 │   │       ├── plugins/  # CORS, JWT
 │   │       └── middleware/
 │   └── frontend/         # React app
-│       └── src/
-│           ├── pages/    # All route pages
-│           ├── components/
-│           │   ├── ui/   # shadcn/ui components
-│           │   ├── layout/
-│           │   ├── clients/
-│           │   ├── payments/
-│           │   ├── files/
-│           │   └── dashboard/
-│           ├── hooks/    # React Query hooks
+│       ├── public/      # Static assets
+│       └── src/          # Frontend source code
 │           ├── api/      # Axios API functions
+│           ├── components/
+│           │   ├── dashboard/
+│           │   ├── files/
+│           │   ├── layout/
+│           │   ├── payments/
+│           │   ├── clients/
+│           │   └── ui/
+│           ├── hooks/    # React Query hooks
+│           ├── pages/    # Route pages
 │           ├── store/    # Zustand stores
 │           └── types/    # Shared TypeScript types
-├── docker-compose.yml    # PostgreSQL + MinIO
-└── package.json          # Workspace root
+├── docker-compose.yml    # PostgreSQL + MinIO local infrastructure
+└── package.json          # Workspace scripts and shared config
 ```
 
-## Quick Start
+## What This Project Includes
 
-### 1. Start infrastructure
+- Client CRUD and status tracking
+- Payment capture, balance tracking, and history
+- File uploads with versioning and S3-compatible storage
+- File comments and activity log
+- Shareable public file links
+- Dashboard analytics and client growth charts
+- Full-stack development setup with Docker
+
+## Docker Setup
+
+The repo includes `docker-compose.yml` to start local infrastructure for development.
+
+Services:
+- `postgres` — PostgreSQL database on port `5432`
+- `minio` — MinIO S3-compatible storage on ports `9000` (API) and `9001` (console)
+- `minio-init` — creates the required `klyent-files` bucket and configures public downloads
+
+Start the stack:
 
 ```bash
 docker-compose up -d
 ```
 
-This starts:
-- PostgreSQL on port 5432
-- MinIO (S3-compatible) on port 9000 (API) + 9001 (console)
+Stop the stack:
 
-### 2. Backend setup
+```bash
+docker-compose down
+```
+
+## How to Run the Project
+
+### 1. Install dependencies
+
+From the repository root:
+
+```bash
+npm install
+```
+
+### 2. Start infrastructure
+
+```bash
+docker-compose up -d
+```
+
+### 3. Configure backend environment
+
+From `apps/backend`:
 
 ```bash
 cd apps/backend
-cp .env.example .env      # edit DATABASE_URL, JWT_SECRET if needed
-npm install
-npm run db:migrate        # run Prisma migrations
-npm run db:seed           # seed demo data
-npm run dev               # start on http://localhost:3001
+cp .env.example .env
 ```
 
-### 3. Frontend setup
+Update `apps/backend/.env` if needed.
+
+### 4. Run database migrations and seed data
 
 ```bash
-cd apps/frontend
-npm install
-npm run dev               # start on http://localhost:5173
+npm run db:migrate
+npm run db:seed
 ```
 
-### 4. Open the app
+### 5. Start the application
 
-Visit [http://localhost:5173](http://localhost:5173)
+From the root:
 
-**Demo accounts:**
-| Role | Email | Password |
-|---|---|---|
-| Admin | admin@klyent.com | Admin123! |
-| Member | member@klyent.com | Member123! |
+```bash
+npm run dev
+```
 
----
+Visit:
 
-## Features
+```text
+http://localhost:5173
+```
+
+## Available Scripts
+
+From the repository root:
+
+- `npm install` — install workspace dependencies
+- `npm run dev` — start backend and frontend concurrently
+- `npm run build` — build backend and frontend
+- `npm run db:migrate` — run Prisma migrations
+- `npm run db:seed` — seed the database
+- `npm run db:studio` — start Prisma Studio
+
+Backend scripts (`apps/backend`):
+
+- `npm run dev` — start backend in watch mode
+- `npm run build` — compile TypeScript
+- `npm run start` — run compiled backend
+- `npm run db:generate` — generate Prisma client
+- `npm run db:migrate` — apply migrations
+- `npm run db:seed` — seed data
+- `npm run db:studio` — open Prisma Studio
+
+Frontend scripts (`apps/frontend`):
+
+- `npm run dev` — start Vite development server
+- `npm run build` — build frontend
+- `npm run preview` — preview production build
+- `npm run lint` — run ESLint
+
+## Key Functionality
 
 ### Client Management
-- Create, read, update, delete clients
-- Status tracking: Active, Completed, On Hold
-- Full-text search by name and email
-- Per-client payment summary and progress
+- Add, edit, and remove clients
+- Search by name or email
+- Track client status and progress
 
-### Payment Tracking
-- Multiple payments per client
-- Methods: Cash, Online, Cheque
-- Auto-calculated: total paid, remaining balance
-- Payment timeline UI
-- Mark client as fully paid
+### Payments
+- Record client payments
+- Support multiple payment methods
+- Auto-calculate totals and remaining balance
+- Show payment history timeline
 
-### Document Management
-- Upload PDF / JPG / PNG files per client
-- Automatic versioning (each upload creates a new version)
-- Presigned S3 URLs for secure access
-- In-browser preview (images + PDFs)
-- Shareable read-only links (no auth required)
+### File Management
+- Upload PDF, JPG, PNG files
+- Store files in S3-compatible storage
+- Version uploaded files
+- Preview files in-browser
+- Share files publicly with token links
 
 ### Collaboration
-- Comment threads on files
-- Per-client activity log (payments, uploads, status changes)
+- File comment threads
+- Client activity logs for payments, uploads, and status changes
 
-### Dashboard & Analytics
-- Revenue totals and monthly trends
-- Client growth over time
-- Pending payments summary
+### Dashboard
+- Revenue summaries
+- Client growth charts
+- Pending payment totals
 - Recent activity feed
+
+## API Overview
+
+Base API URL: `http://localhost:3001/api`
+
+### Auth
+- `POST /auth/register` — Register a new user
+- `POST /auth/login` — Login and receive JWT
+- `GET /auth/me` — Get current user information
+
+### Clients
+- `GET /clients` — List clients
+- `POST /clients` — Create a client
+- `GET /clients/:id` — Get a client
+- `PATCH /clients/:id` — Update a client
+- `DELETE /clients/:id` — Remove a client
+- `GET /clients/:id/stats` — Get client payment stats
+
+### Payments
+- `GET /payments` — List payments
+- `POST /payments` — Create a payment
+- `PATCH /payments/:id` — Update a payment
+- `DELETE /payments/:id` — Delete a payment
+
+### Files
+- `GET /files?clientId=X` — List client files
+- `POST /files/upload` — Upload a file
+- `GET /files/:id/versions` — File version history
+- `GET /files/:id/download` — Download file
+- `GET /files/:id/preview` — Get preview URL
+- `DELETE /files/:id` — Delete file
+- `GET /files/share/:token` — Shared public file access
+- `GET /files/:id/comments` — List comments
+- `POST /files/:id/comments` — Create comment
+
+### Dashboard
+- `GET /dashboard/stats` — Summary analytics data
+
+### Activity
+- `GET /activity` — Activity log
+
+## Environment Variables
+
+Typical backend environment variables for `apps/backend/.env`:
+
+```env
+DATABASE_URL="postgresql://postgres:password@localhost:5432/klyent?schema=public"
+JWT_SECRET="your_jwt_secret"
+JWT_EXPIRY="7d"
+PORT=3001
+CORS_ORIGIN="http://localhost:5173"
+
+S3_ENDPOINT="http://localhost:9000"
+S3_REGION="us-east-1"
+S3_ACCESS_KEY_ID="minioadmin"
+S3_SECRET_ACCESS_KEY="minioadmin"
+S3_BUCKET="klyent-files"
+```
+
+## Notes
+
+- The frontend talks to the backend on `http://localhost:3001`.
+- Local file storage uses MinIO and the `klyent-files` bucket.
+- Public share links allow read-only access without authentication.
+- Use `npm run build` before deploying to production.
+
+## License
+
+Private repository.
+
 
 ---
 

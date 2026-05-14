@@ -107,6 +107,9 @@ export function FileList({ files, isLoading, clientId }: FileListProps) {
                   <p className="text-sm font-medium text-foreground truncate" title={file.name}>
                     {file.name}
                   </p>
+                  {file.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{file.description}</p>
+                  )}
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {file.latestVersion && (
                       <span className="text-xs text-muted-foreground">
