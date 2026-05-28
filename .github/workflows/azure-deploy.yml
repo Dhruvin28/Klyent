@@ -26,6 +26,11 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Push database schema
+        run: npm run db:push --workspace=apps/backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Remove dev dependencies
         run: npm prune --omit=dev
 
