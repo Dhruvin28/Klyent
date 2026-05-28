@@ -6,15 +6,43 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install all dependencies
+        run: npm install
+
+      - name: Build frontend and backend
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Install backend production dependencies
+        run: npm install --omit=dev
+        working-directory: apps/backend
+
+      - name: Package deployment artifacts
+        run: |
+          mkdir -p deploy/apps/backend
+          mkdir -p deploy/apps/frontend
+          cp -r apps/backend/dist deploy/apps/backend/dist
+          cp -r apps/backend/node_modules deploy/apps/backend/node_modules
+          cp apps/backend/package.json deploy/apps/backend/package.json
+          cp -r apps/frontend/dist deploy/apps/frontend/dist
+          cp package.json deploy/package.json
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: knowyourlabel
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: .
+          package: deploy
