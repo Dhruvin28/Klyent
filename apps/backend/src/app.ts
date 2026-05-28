@@ -1,5 +1,8 @@
+import path from 'path'
+import fs from 'fs'
 import Fastify, { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
+import staticPlugin from '@fastify/static'
 import websocket from '@fastify/websocket'
 import { config } from './config'
 import corsPlugin from './plugins/cors'
@@ -90,6 +93,16 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(fileRoutes, { prefix: '/api/files' })
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' })
   await app.register(activityRoutes, { prefix: '/api/activity' })
+
+  // Serve frontend static files in production
+  const frontendDist = path.join(__dirname, '../../frontend/dist')
+  if (process.env.NODE_ENV === 'production' && fs.existsSync(frontendDist)) {
+    await app.register(staticPlugin, { root: frontendDist, prefix: '/', decorateReply: false })
+    // SPA fallback — serve index.html for all non-API routes
+    app.setNotFoundHandler((_request, reply) => {
+      reply.sendFile('index.html', frontendDist)
+    })
+  }
 
   return app
 }

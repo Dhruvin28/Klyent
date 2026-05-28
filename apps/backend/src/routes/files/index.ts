@@ -179,7 +179,7 @@ export default async function fileRoutes(app: FastifyInstance) {
     // Upload to S3
     await s3Client.send(
       new PutObjectCommand({
-        Bucket: config.s3.bucket,
+        Bucket: config.r2.bucket,
         Key: s3Key,
         Body: fileBuffer,
         ContentType: mimeType,
@@ -198,7 +198,7 @@ export default async function fileRoutes(app: FastifyInstance) {
       data: {
         versionNumber: nextVersionNumber,
         s3Key,
-        s3Bucket: config.s3.bucket,
+        s3Bucket: config.r2.bucket,
         size: fileSize,
         isActive: true,
         uploadedById: userId,

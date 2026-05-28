@@ -7,13 +7,12 @@ export const config = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
-  s3: {
-    region: process.env.S3_REGION ?? 'us-east-1',
-    bucket: process.env.S3_BUCKET ?? 'klyent-files',
-    endpoint: process.env.S3_ENDPOINT,
-    accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '',
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+  r2: {
+    accountId: process.env.R2_ACCOUNT_ID ?? '',
+    accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
+    bucket: process.env.R2_BUCKET_NAME ?? '',
+    publicUrl: process.env.R2_PUBLIC_URL ?? '',
   },
   uploadMaxSize: 50 * 1024 * 1024, // 50MB
   allowedMimeTypes: [
