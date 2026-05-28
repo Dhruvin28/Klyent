@@ -6,6 +6,9 @@ const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   waitForConnections: true,
   connectionLimit: 10,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 })
 
 export const db = drizzle(pool, { schema, mode: 'default' })
