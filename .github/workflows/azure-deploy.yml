@@ -27,7 +27,8 @@ jobs:
           NODE_ENV: production
 
       - name: Push database schema
-        run: npm run db:push --workspace=apps/backend
+        run: npx drizzle-kit push --force
+        working-directory: apps/backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
