@@ -1,4 +1,6 @@
-import 'dotenv/config'
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config()
+}
 import { buildApp } from './app'
 import { config } from './config'
 
