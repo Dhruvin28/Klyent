@@ -1,7 +1,11 @@
 import 'dotenv/config'
 import { defineConfig } from 'drizzle-kit'
 
-const url = new URL(process.env.DATABASE_URL!)
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is required')
+}
+
+const url = new URL(process.env.DATABASE_URL)
 
 export default defineConfig({
   schema: './src/db/schema.ts',
