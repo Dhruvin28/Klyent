@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify'
-import { prisma } from '../../lib/prisma'
+import { eq, and, gte, inArray, count, sql } from 'drizzle-orm'
+import { db, clients, payments, activityLogs, users } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 
 export default async function dashboardRoutes(app: FastifyInstance) {
@@ -14,60 +15,87 @@ export default async function dashboardRoutes(app: FastifyInstance) {
 
     // Run all queries in parallel
     const [
-      clientCounts,
-      allClients,
-      totalRevenueAgg,
+      clientStatusCounts,
+      allActiveClients,
+      totalRevenueRow,
       recentPayments,
       recentClients,
       recentActivity,
     ] = await Promise.all([
-      prisma.client.groupBy({
-        by: ['status'],
-        where: { userId },
-        _count: true,
-      }),
+      // Client counts by status
+      db
+        .select({ status: clients.status, count: count() })
+        .from(clients)
+        .where(eq(clients.userId, userId))
+        .groupBy(clients.status),
 
-      prisma.client.findMany({
-        where: { userId, status: { in: ['ACTIVE', 'ON_HOLD'] } },
-        select: {
-          totalDealAmount: true,
-          payments: { select: { amount: true } },
-        },
-      }),
+      // All active/on-hold clients with their payment amounts for pending balance
+      db
+        .select({ totalDealAmount: clients.totalDealAmount, clientId: clients.id })
+        .from(clients)
+        .where(and(eq(clients.userId, userId), inArray(clients.status, ['ACTIVE', 'ON_HOLD']))),
 
-      prisma.payment.aggregate({
-        where: { client: { userId } },
-        _sum: { amount: true },
-      }),
+      // Total revenue (all payments for this user's clients)
+      db
+        .select({ total: sql<string>`sum(${payments.amount})` })
+        .from(payments)
+        .innerJoin(clients, and(eq(payments.clientId, clients.id), eq(clients.userId, userId))),
 
       // Payments in last 12 months for monthly revenue chart
-      prisma.payment.findMany({
-        where: {
-          client: { userId },
-          date: { gte: twelveMonthsAgo },
-        },
-        select: { date: true, amount: true },
-      }),
+      db
+        .select({ date: payments.date, amount: payments.amount })
+        .from(payments)
+        .innerJoin(clients, and(eq(payments.clientId, clients.id), eq(clients.userId, userId)))
+        .where(gte(payments.date, twelveMonthsAgo)),
 
       // Clients created in last 12 months for growth chart
-      prisma.client.findMany({
-        where: {
-          userId,
-          createdAt: { gte: twelveMonthsAgo },
-        },
-        select: { createdAt: true },
-      }),
+      db
+        .select({ createdAt: clients.createdAt })
+        .from(clients)
+        .where(and(eq(clients.userId, userId), gte(clients.createdAt, twelveMonthsAgo))),
 
-      prisma.activityLog.findMany({
-        where: { client: { userId } },
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { id: true, name: true } },
-          client: { select: { id: true, name: true } },
-        },
-      }),
+      // Recent activity logs (join with clients to filter by userId)
+      db
+        .select({
+          id: activityLogs.id,
+          type: activityLogs.type,
+          metadata: activityLogs.metadata,
+          clientId: activityLogs.clientId,
+          userId: activityLogs.userId,
+          createdAt: activityLogs.createdAt,
+          userName: users.name,
+          userId2: users.id,
+          clientName: clients.name,
+          clientId2: clients.id,
+        })
+        .from(activityLogs)
+        .innerJoin(clients, and(eq(activityLogs.clientId, clients.id), eq(clients.userId, userId)))
+        .innerJoin(users, eq(activityLogs.userId, users.id))
+        .orderBy(sql`${activityLogs.createdAt} desc`)
+        .limit(10),
     ])
+
+    // For pending balance, we need the paid amounts for active/on-hold clients
+    const activeClientIds = allActiveClients.map((c) => c.clientId)
+    const paidAmounts =
+      activeClientIds.length > 0
+        ? await db
+            .select({
+              clientId: payments.clientId,
+              paid: sql<string>`sum(${payments.amount})`,
+            })
+            .from(payments)
+            .where(inArray(payments.clientId, activeClientIds))
+            .groupBy(payments.clientId)
+        : []
+
+    const paidMap = new Map(paidAmounts.map((p) => [p.clientId, Number(p.paid ?? 0)]))
+
+    const pendingPayments = allActiveClients.reduce((sum, client) => {
+      const totalPaid = paidMap.get(client.clientId) ?? 0
+      const remaining = Number(client.totalDealAmount) - totalPaid
+      return sum + (remaining > 0 ? remaining : 0)
+    }, 0)
 
     // Aggregate monthly revenue in JS
     const revenueMap = new Map<string, { month: number; year: number; total: number }>()
@@ -97,18 +125,23 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       a.year !== b.year ? a.year - b.year : a.month - b.month
 
     // Calculate totals
-    const totalClients = clientCounts.reduce((sum, g) => sum + g._count, 0)
-    const activeClients = clientCounts.find((g) => g.status === 'ACTIVE')?._count ?? 0
-    const completedClients = clientCounts.find((g) => g.status === 'COMPLETED')?._count ?? 0
-    const onHoldClients = clientCounts.find((g) => g.status === 'ON_HOLD')?._count ?? 0
+    const totalClients = clientStatusCounts.reduce((sum, g) => sum + Number(g.count), 0)
+    const activeClients = Number(clientStatusCounts.find((g) => g.status === 'ACTIVE')?.count ?? 0)
+    const completedClients = Number(clientStatusCounts.find((g) => g.status === 'COMPLETED')?.count ?? 0)
+    const onHoldClients = Number(clientStatusCounts.find((g) => g.status === 'ON_HOLD')?.count ?? 0)
 
-    const pendingPayments = allClients.reduce((sum, client) => {
-      const totalPaid = client.payments.reduce((s, p) => s + Number(p.amount), 0)
-      const remaining = Number(client.totalDealAmount) - totalPaid
-      return sum + (remaining > 0 ? remaining : 0)
-    }, 0)
+    const totalRevenue = Number(totalRevenueRow[0]?.total ?? 0)
 
-    const totalRevenue = Number(totalRevenueAgg._sum.amount ?? 0)
+    const formattedActivity = recentActivity.map((a) => ({
+      id: a.id,
+      type: a.type,
+      metadata: a.metadata,
+      clientId: a.clientId,
+      userId: a.userId,
+      createdAt: a.createdAt,
+      user: { id: a.userId2, name: a.userName },
+      client: { id: a.clientId2, name: a.clientName },
+    }))
 
     return reply.send({
       data: {
@@ -120,7 +153,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         pendingPayments,
         monthlyRevenue: Array.from(revenueMap.values()).sort(sortByYearMonth),
         clientGrowth: Array.from(growthMap.values()).sort(sortByYearMonth),
-        recentActivity,
+        recentActivity: formattedActivity,
       },
     })
   })

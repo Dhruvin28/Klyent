@@ -26,9 +26,6 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Generate Prisma client
-        run: npm run db:generate
-
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:

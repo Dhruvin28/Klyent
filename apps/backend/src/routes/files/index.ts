@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { prisma } from '../../lib/prisma'
+import { eq, and, desc, count } from 'drizzle-orm'
+import { db, clients, files, fileVersions, comments, activityLogs, users } from '../../db'
 import { s3Client, getPresignedDownloadUrl, deleteS3Object } from '../../lib/s3'
 import { authenticate } from '../../middleware/authenticate'
 import { config } from '../../config'
@@ -35,10 +36,11 @@ export default async function fileRoutes(app: FastifyInstance) {
     const { clientId } = queryResult.data
 
     // Verify ownership
-    const client = await prisma.client.findUnique({
-      where: { id: clientId },
-      select: { userId: true },
-    })
+    const [client] = await db
+      .select({ userId: clients.userId })
+      .from(clients)
+      .where(eq(clients.id, clientId))
+      .limit(1)
 
     if (!client) {
       return reply.code(404).send({ error: 'Client not found' })
@@ -47,25 +49,87 @@ export default async function fileRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const files = await prisma.file.findMany({
-      where: { clientId },
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        versions: {
-          where: { isActive: true },
-          orderBy: { versionNumber: 'desc' },
-          take: 1,
-          include: {
-            uploadedBy: { select: { id: true, name: true } },
-          },
-        },
+    const fileRows = await db
+      .select()
+      .from(files)
+      .where(eq(files.clientId, clientId))
+      .orderBy(desc(files.updatedAt))
+
+    // For each file, fetch the active version and counts
+    const fileIds = fileRows.map((f) => f.id)
+    const [activeVersions, versionCounts, commentCounts] = await Promise.all([
+      fileIds.length > 0
+        ? db
+            .select({
+              fileId: fileVersions.fileId,
+              id: fileVersions.id,
+              versionNumber: fileVersions.versionNumber,
+              s3Key: fileVersions.s3Key,
+              s3Bucket: fileVersions.s3Bucket,
+              size: fileVersions.size,
+              isActive: fileVersions.isActive,
+              uploadedById: fileVersions.uploadedById,
+              createdAt: fileVersions.createdAt,
+              uploaderName: users.name,
+            })
+            .from(fileVersions)
+            .innerJoin(users, eq(fileVersions.uploadedById, users.id))
+            .where(and(eq(fileVersions.isActive, true)))
+            .orderBy(desc(fileVersions.versionNumber))
+        : [],
+      fileIds.length > 0
+        ? db
+            .select({ fileId: fileVersions.fileId, cnt: count() })
+            .from(fileVersions)
+            .where(eq(fileVersions.isActive, fileVersions.isActive))
+            .groupBy(fileVersions.fileId)
+        : [],
+      fileIds.length > 0
+        ? db
+            .select({ fileId: comments.fileId, cnt: count() })
+            .from(comments)
+            .groupBy(comments.fileId)
+        : [],
+    ])
+
+    // Index by fileId — keep only first (highest version)
+    const activeVersionMap = new Map<string, (typeof activeVersions)[0]>()
+    for (const v of activeVersions) {
+      if (!activeVersionMap.has(v.fileId)) {
+        activeVersionMap.set(v.fileId, v)
+      }
+    }
+    const versionCountMap = new Map(versionCounts.map((r) => [r.fileId, Number(r.cnt)]))
+    const commentCountMap = new Map(commentCounts.map((r) => [r.fileId, Number(r.cnt)]))
+
+    const result = fileRows.map((file) => {
+      const av = activeVersionMap.get(file.id)
+      return {
+        ...file,
+        versions: av
+          ? [
+              {
+                id: av.id,
+                versionNumber: av.versionNumber,
+                s3Key: av.s3Key,
+                s3Bucket: av.s3Bucket,
+                size: av.size,
+                isActive: av.isActive,
+                uploadedById: av.uploadedById,
+                fileId: av.fileId,
+                createdAt: av.createdAt,
+                uploadedBy: { id: av.uploadedById, name: av.uploaderName },
+              },
+            ]
+          : [],
         _count: {
-          select: { versions: true, comments: true },
+          versions: versionCountMap.get(file.id) ?? 0,
+          comments: commentCountMap.get(file.id) ?? 0,
         },
-      },
+      }
     })
 
-    return reply.send({ data: files })
+    return reply.send({ data: result })
   })
 
   // POST /api/files/upload - multipart file upload (requires auth)
@@ -94,10 +158,11 @@ export default async function fileRoutes(app: FastifyInstance) {
     const description = descriptionField?.value?.trim() || undefined
 
     // Verify ownership
-    const client = await prisma.client.findUnique({
-      where: { id: clientId },
-      select: { userId: true, name: true },
-    })
+    const [client] = await db
+      .select({ userId: clients.userId, name: clients.name })
+      .from(clients)
+      .where(eq(clients.id, clientId))
+      .limit(1)
 
     if (!client) {
       data.file.resume()
@@ -121,39 +186,47 @@ export default async function fileRoutes(app: FastifyInstance) {
     const filename = customName || data.filename
 
     // Check if file with same name exists for this client
-    let existingFile = await prisma.file.findFirst({
-      where: { clientId, name: filename },
-      include: {
-        versions: {
-          orderBy: { versionNumber: 'desc' },
-          take: 1,
-        },
-      },
-    })
+    const [existingFile] = await db
+      .select()
+      .from(files)
+      .where(and(eq(files.clientId, clientId), eq(files.name, filename)))
+      .limit(1)
+
+    let latestVersionNumber = 0
+    if (existingFile) {
+      const [latestVersion] = await db
+        .select()
+        .from(fileVersions)
+        .where(eq(fileVersions.fileId, existingFile.id))
+        .orderBy(desc(fileVersions.versionNumber))
+        .limit(1)
+      latestVersionNumber = latestVersion?.versionNumber ?? 0
+    }
 
     const isNewVersion = existingFile !== null
-    const nextVersionNumber = isNewVersion ? (existingFile!.versions[0]?.versionNumber ?? 0) + 1 : 1
+    const nextVersionNumber = latestVersionNumber + 1
 
     // Create File record first if new
     let fileId: string
     if (!isNewVersion) {
-      const newFile = await prisma.file.create({
-        data: {
-          name: filename,
-          description,
-          mimeType,
-          clientId,
-        },
+      fileId = crypto.randomUUID()
+      const shareToken = crypto.randomUUID()
+      await db.insert(files).values({
+        id: fileId,
+        name: filename,
+        description,
+        mimeType,
+        clientId,
+        shareToken,
       })
-      fileId = newFile.id
     } else {
       fileId = existingFile!.id
 
       // Mark previous versions as inactive
-      await prisma.fileVersion.updateMany({
-        where: { fileId, isActive: true },
-        data: { isActive: false },
-      })
+      await db
+        .update(fileVersions)
+        .set({ isActive: false })
+        .where(and(eq(fileVersions.fileId, fileId), eq(fileVersions.isActive, true)))
     }
 
     // S3 key
@@ -168,7 +241,7 @@ export default async function fileRoutes(app: FastifyInstance) {
     if (data.file.truncated) {
       // File exceeded size limit
       if (!isNewVersion) {
-        await prisma.file.delete({ where: { id: fileId } })
+        await db.delete(files).where(eq(files.id, fileId))
       }
       return reply.code(413).send({ error: 'File too large. Maximum size is 50MB.' })
     }
@@ -194,56 +267,69 @@ export default async function fileRoutes(app: FastifyInstance) {
     )
 
     // Create FileVersion
-    const version = await prisma.fileVersion.create({
-      data: {
-        versionNumber: nextVersionNumber,
-        s3Key,
-        s3Bucket: config.r2.bucket,
-        size: fileSize,
-        isActive: true,
-        uploadedById: userId,
-        fileId,
-      },
+    const versionId = crypto.randomUUID()
+    await db.insert(fileVersions).values({
+      id: versionId,
+      versionNumber: nextVersionNumber,
+      s3Key,
+      s3Bucket: config.r2.bucket,
+      size: fileSize,
+      isActive: true,
+      uploadedById: userId,
+      fileId,
     })
+
+    const [version] = await db.select().from(fileVersions).where(eq(fileVersions.id, versionId)).limit(1)
 
     // Update file updatedAt (and description if provided)
-    await prisma.file.update({
-      where: { id: fileId },
-      data: {
-        updatedAt: new Date(),
-        ...(description !== undefined && { description }),
-      },
-    })
+    const fileUpdate: Record<string, unknown> = { updatedAt: new Date() }
+    if (description !== undefined) fileUpdate.description = description
+    await db.update(files).set(fileUpdate).where(eq(files.id, fileId))
 
     // Log activity
-    await prisma.activityLog.create({
-      data: {
-        type: isNewVersion ? 'FILE_VERSION_ADDED' : 'FILE_UPLOADED',
-        metadata: {
-          fileId,
-          fileName: filename,
-          versionNumber: nextVersionNumber,
-          size: fileSize,
-          clientName: client.name,
-        },
-        clientId,
-        userId,
+    const logId = crypto.randomUUID()
+    await db.insert(activityLogs).values({
+      id: logId,
+      type: isNewVersion ? 'FILE_VERSION_ADDED' : 'FILE_UPLOADED',
+      metadata: {
+        fileId,
+        fileName: filename,
+        versionNumber: nextVersionNumber,
+        size: fileSize,
+        clientName: client.name,
       },
+      clientId,
+      userId,
     })
 
-    const file = await prisma.file.findUnique({
-      where: { id: fileId },
-      include: {
-        versions: {
-          where: { isActive: true },
-          take: 1,
-          include: { uploadedBy: { select: { id: true, name: true } } },
-        },
-      },
-    })
+    // Return the full file with active version
+    const [file] = await db.select().from(files).where(eq(files.id, fileId)).limit(1)
+    const activeVersionRows = await db
+      .select({
+        id: fileVersions.id,
+        versionNumber: fileVersions.versionNumber,
+        s3Key: fileVersions.s3Key,
+        s3Bucket: fileVersions.s3Bucket,
+        size: fileVersions.size,
+        isActive: fileVersions.isActive,
+        uploadedById: fileVersions.uploadedById,
+        fileId: fileVersions.fileId,
+        createdAt: fileVersions.createdAt,
+        uploaderName: users.name,
+      })
+      .from(fileVersions)
+      .innerJoin(users, eq(fileVersions.uploadedById, users.id))
+      .where(and(eq(fileVersions.fileId, fileId), eq(fileVersions.isActive, true)))
+      .limit(1)
 
     return reply.code(201).send({
-      data: file,
+      data: {
+        ...file,
+        versions: activeVersionRows.map((v) => ({
+          ...v,
+          uploadedBy: { id: v.uploadedById, name: v.uploaderName },
+        })),
+      },
       version,
     })
   })
@@ -253,27 +339,47 @@ export default async function fileRoutes(app: FastifyInstance) {
     const userId = request.user.sub
     const { id } = request.params as { id: string }
 
-    const file = await prisma.file.findUnique({
-      where: { id },
-      include: {
-        client: { select: { userId: true } },
-        versions: {
-          orderBy: { versionNumber: 'desc' },
-          include: {
-            uploadedBy: { select: { id: true, name: true } },
-          },
-        },
-      },
-    })
+    const [file] = await db
+      .select({
+        id: files.id,
+        clientUserId: clients.userId,
+      })
+      .from(files)
+      .innerJoin(clients, eq(files.clientId, clients.id))
+      .where(eq(files.id, id))
+      .limit(1)
 
     if (!file) {
       return reply.code(404).send({ error: 'File not found' })
     }
-    if (file.client.userId !== userId) {
+    if (file.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    return reply.send({ data: file.versions })
+    const versions = await db
+      .select({
+        id: fileVersions.id,
+        versionNumber: fileVersions.versionNumber,
+        s3Key: fileVersions.s3Key,
+        s3Bucket: fileVersions.s3Bucket,
+        size: fileVersions.size,
+        isActive: fileVersions.isActive,
+        uploadedById: fileVersions.uploadedById,
+        fileId: fileVersions.fileId,
+        createdAt: fileVersions.createdAt,
+        uploaderName: users.name,
+      })
+      .from(fileVersions)
+      .innerJoin(users, eq(fileVersions.uploadedById, users.id))
+      .where(eq(fileVersions.fileId, id))
+      .orderBy(desc(fileVersions.versionNumber))
+
+    return reply.send({
+      data: versions.map((v) => ({
+        ...v,
+        uploadedBy: { id: v.uploadedById, name: v.uploaderName },
+      })),
+    })
   })
 
   // GET /api/files/:id/download - redirect to presigned S3 URL
@@ -281,26 +387,27 @@ export default async function fileRoutes(app: FastifyInstance) {
     const userId = request.user.sub
     const { id } = request.params as { id: string }
 
-    const file = await prisma.file.findUnique({
-      where: { id },
-      include: {
-        client: { select: { userId: true } },
-        versions: {
-          where: { isActive: true },
-          orderBy: { versionNumber: 'desc' },
-          take: 1,
-        },
-      },
-    })
+    const [file] = await db
+      .select({ id: files.id, clientUserId: clients.userId })
+      .from(files)
+      .innerJoin(clients, eq(files.clientId, clients.id))
+      .where(eq(files.id, id))
+      .limit(1)
 
     if (!file) {
       return reply.code(404).send({ error: 'File not found' })
     }
-    if (file.client.userId !== userId) {
+    if (file.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const activeVersion = file.versions[0]
+    const [activeVersion] = await db
+      .select()
+      .from(fileVersions)
+      .where(and(eq(fileVersions.fileId, id), eq(fileVersions.isActive, true)))
+      .orderBy(desc(fileVersions.versionNumber))
+      .limit(1)
+
     if (!activeVersion) {
       return reply.code(404).send({ error: 'No active version found' })
     }
@@ -314,26 +421,32 @@ export default async function fileRoutes(app: FastifyInstance) {
     const userId = request.user.sub
     const { id } = request.params as { id: string }
 
-    const file = await prisma.file.findUnique({
-      where: { id },
-      include: {
-        client: { select: { userId: true } },
-        versions: {
-          where: { isActive: true },
-          orderBy: { versionNumber: 'desc' },
-          take: 1,
-        },
-      },
-    })
+    const [file] = await db
+      .select({
+        id: files.id,
+        name: files.name,
+        mimeType: files.mimeType,
+        clientUserId: clients.userId,
+      })
+      .from(files)
+      .innerJoin(clients, eq(files.clientId, clients.id))
+      .where(eq(files.id, id))
+      .limit(1)
 
     if (!file) {
       return reply.code(404).send({ error: 'File not found' })
     }
-    if (file.client.userId !== userId) {
+    if (file.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const activeVersion = file.versions[0]
+    const [activeVersion] = await db
+      .select()
+      .from(fileVersions)
+      .where(and(eq(fileVersions.fileId, id), eq(fileVersions.isActive, true)))
+      .orderBy(desc(fileVersions.versionNumber))
+      .limit(1)
+
     if (!activeVersion) {
       return reply.code(404).send({ error: 'No active version found' })
     }
@@ -361,37 +474,34 @@ export default async function fileRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const { hard } = request.query as { hard?: string }
 
-    const file = await prisma.file.findUnique({
-      where: { id },
-      include: {
-        client: { select: { userId: true } },
-        versions: true,
-      },
-    })
+    const [file] = await db
+      .select({ id: files.id, clientUserId: clients.userId })
+      .from(files)
+      .innerJoin(clients, eq(files.clientId, clients.id))
+      .where(eq(files.id, id))
+      .limit(1)
 
     if (!file) {
       return reply.code(404).send({ error: 'File not found' })
     }
-    if (file.client.userId !== userId) {
+    if (file.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
     if (hard === 'true') {
       // Hard delete: remove from S3 and database
-      for (const version of file.versions) {
+      const allVersions = await db.select().from(fileVersions).where(eq(fileVersions.fileId, id))
+      for (const version of allVersions) {
         try {
           await deleteS3Object(version.s3Key)
         } catch (err) {
           app.log.warn({ err, s3Key: version.s3Key }, 'Failed to delete S3 object')
         }
       }
-      await prisma.file.delete({ where: { id } })
+      await db.delete(files).where(eq(files.id, id))
     } else {
       // Soft delete: deactivate all versions
-      await prisma.fileVersion.updateMany({
-        where: { fileId: id },
-        data: { isActive: false },
-      })
+      await db.update(fileVersions).set({ isActive: false }).where(eq(fileVersions.fileId, id))
     }
 
     return reply.code(204).send()
@@ -401,23 +511,33 @@ export default async function fileRoutes(app: FastifyInstance) {
   app.get('/share/:token', async (request, reply) => {
     const { token } = request.params as { token: string }
 
-    const file = await prisma.file.findUnique({
-      where: { shareToken: token },
-      include: {
-        versions: {
-          where: { isActive: true },
-          orderBy: { versionNumber: 'desc' },
-          take: 1,
-        },
-        client: { select: { name: true } },
-      },
-    })
+    const [file] = await db
+      .select({
+        id: files.id,
+        name: files.name,
+        mimeType: files.mimeType,
+        createdAt: files.createdAt,
+        updatedAt: files.updatedAt,
+        shareToken: files.shareToken,
+        clientId: files.clientId,
+        clientName: clients.name,
+      })
+      .from(files)
+      .innerJoin(clients, eq(files.clientId, clients.id))
+      .where(eq(files.shareToken, token))
+      .limit(1)
 
     if (!file) {
       return reply.code(404).send({ error: 'File not found or share link is invalid' })
     }
 
-    const activeVersion = file.versions[0]
+    const [activeVersion] = await db
+      .select()
+      .from(fileVersions)
+      .where(and(eq(fileVersions.fileId, file.id), eq(fileVersions.isActive, true)))
+      .orderBy(desc(fileVersions.versionNumber))
+      .limit(1)
+
     if (!activeVersion) {
       return reply.code(404).send({ error: 'No active version available' })
     }
@@ -429,7 +549,7 @@ export default async function fileRoutes(app: FastifyInstance) {
         id: file.id,
         name: file.name,
         mimeType: file.mimeType,
-        clientName: file.client.name,
+        clientName: file.clientName,
         versionNumber: activeVersion.versionNumber,
         size: activeVersion.size,
         createdAt: file.createdAt,
@@ -453,43 +573,63 @@ export default async function fileRoutes(app: FastifyInstance) {
       })
     }
 
-    const file = await prisma.file.findUnique({
-      where: { id },
-      include: { client: { select: { userId: true, id: true } } },
-    })
+    const [file] = await db
+      .select({ id: files.id, name: files.name, clientId: files.clientId, clientUserId: clients.userId })
+      .from(files)
+      .innerJoin(clients, eq(files.clientId, clients.id))
+      .where(eq(files.id, id))
+      .limit(1)
 
     if (!file) {
       return reply.code(404).send({ error: 'File not found' })
     }
-    if (file.client.userId !== userId) {
+    if (file.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const comment = await prisma.comment.create({
-      data: {
-        content: result.data.content,
+    const commentId = crypto.randomUUID()
+    await db.insert(comments).values({
+      id: commentId,
+      content: result.data.content,
+      fileId: id,
+      userId,
+    })
+
+    const [comment] = await db
+      .select({
+        id: comments.id,
+        content: comments.content,
+        fileId: comments.fileId,
+        userId: comments.userId,
+        createdAt: comments.createdAt,
+        updatedAt: comments.updatedAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(comments)
+      .innerJoin(users, eq(comments.userId, users.id))
+      .where(eq(comments.id, commentId))
+      .limit(1)
+
+    const logId = crypto.randomUUID()
+    await db.insert(activityLogs).values({
+      id: logId,
+      type: 'COMMENT_ADDED',
+      metadata: {
         fileId: id,
-        userId,
+        fileName: file.name,
+        commentId,
       },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-      },
+      clientId: file.clientId,
+      userId,
     })
 
-    await prisma.activityLog.create({
+    return reply.code(201).send({
       data: {
-        type: 'COMMENT_ADDED',
-        metadata: {
-          fileId: id,
-          fileName: file.name,
-          commentId: comment.id,
-        },
-        clientId: file.client.id,
-        userId,
+        ...comment,
+        user: { id: comment.userId, name: comment.userName, email: comment.userEmail },
       },
     })
-
-    return reply.code(201).send({ data: comment })
   })
 
   // GET /api/files/:id/comments
@@ -508,38 +648,51 @@ export default async function fileRoutes(app: FastifyInstance) {
     const { page, limit } = queryResult.data
     const skip = (page - 1) * limit
 
-    const file = await prisma.file.findUnique({
-      where: { id },
-      include: { client: { select: { userId: true } } },
-    })
+    const [file] = await db
+      .select({ id: files.id, clientUserId: clients.userId })
+      .from(files)
+      .innerJoin(clients, eq(files.clientId, clients.id))
+      .where(eq(files.id, id))
+      .limit(1)
 
     if (!file) {
       return reply.code(404).send({ error: 'File not found' })
     }
-    if (file.client.userId !== userId) {
+    if (file.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const [comments, total] = await Promise.all([
-      prisma.comment.findMany({
-        where: { fileId: id },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-        },
-      }),
-      prisma.comment.count({ where: { fileId: id } }),
+    const [commentRows, [{ total }]] = await Promise.all([
+      db
+        .select({
+          id: comments.id,
+          content: comments.content,
+          fileId: comments.fileId,
+          userId: comments.userId,
+          createdAt: comments.createdAt,
+          updatedAt: comments.updatedAt,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(comments)
+        .innerJoin(users, eq(comments.userId, users.id))
+        .where(eq(comments.fileId, id))
+        .orderBy(desc(comments.createdAt))
+        .limit(limit)
+        .offset(skip),
+      db.select({ total: count() }).from(comments).where(eq(comments.fileId, id)),
     ])
 
     return reply.send({
-      data: comments,
+      data: commentRows.map((c) => ({
+        ...c,
+        user: { id: c.userId, name: c.userName, email: c.userEmail },
+      })),
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / limit),
       },
     })
   })

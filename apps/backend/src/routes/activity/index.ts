@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
-import { prisma } from '../../lib/prisma'
+import { eq, and, desc, count } from 'drizzle-orm'
+import { db, clients, activityLogs, users } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 
 const listQuerySchema = z.object({
@@ -43,10 +43,11 @@ export default async function activityRoutes(app: FastifyInstance) {
 
     // If clientId provided, verify ownership
     if (clientId) {
-      const client = await prisma.client.findUnique({
-        where: { id: clientId },
-        select: { userId: true },
-      })
+      const [client] = await db
+        .select({ userId: clients.userId })
+        .from(clients)
+        .where(eq(clients.id, clientId))
+        .limit(1)
       if (!client) {
         return reply.code(404).send({ error: 'Client not found' })
       }
@@ -55,33 +56,58 @@ export default async function activityRoutes(app: FastifyInstance) {
       }
     }
 
-    const where: Prisma.ActivityLogWhereInput = {
-      client: { userId },
-      ...(clientId && { clientId }),
-      ...(type && { type }),
-    }
+    // Build conditions
+    const conditions = [eq(clients.userId, userId)]
+    if (clientId) conditions.push(eq(activityLogs.clientId, clientId))
+    if (type) conditions.push(eq(activityLogs.type, type))
 
-    const [logs, total] = await Promise.all([
-      prisma.activityLog.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-          client: { select: { id: true, name: true } },
-        },
-      }),
-      prisma.activityLog.count({ where }),
+    const whereClause = and(...conditions)
+
+    const [logs, [{ total }]] = await Promise.all([
+      db
+        .select({
+          id: activityLogs.id,
+          type: activityLogs.type,
+          metadata: activityLogs.metadata,
+          clientId: activityLogs.clientId,
+          userId: activityLogs.userId,
+          createdAt: activityLogs.createdAt,
+          userName: users.name,
+          userEmail: users.email,
+          userId2: users.id,
+          clientName: clients.name,
+          clientId2: clients.id,
+        })
+        .from(activityLogs)
+        .innerJoin(clients, eq(activityLogs.clientId, clients.id))
+        .innerJoin(users, eq(activityLogs.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(activityLogs.createdAt))
+        .limit(limit)
+        .offset(skip),
+      db
+        .select({ total: count() })
+        .from(activityLogs)
+        .innerJoin(clients, eq(activityLogs.clientId, clients.id))
+        .where(whereClause),
     ])
 
     return reply.send({
-      data: logs,
+      data: logs.map((log) => ({
+        id: log.id,
+        type: log.type,
+        metadata: log.metadata,
+        clientId: log.clientId,
+        userId: log.userId,
+        createdAt: log.createdAt,
+        user: { id: log.userId2, name: log.userName, email: log.userEmail },
+        client: { id: log.clientId2, name: log.clientName },
+      })),
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / limit),
       },
     })
   })

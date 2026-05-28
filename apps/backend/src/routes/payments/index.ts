@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
-import { prisma } from '../../lib/prisma'
+import { eq, and, gte, lte, desc, asc, count, sql } from 'drizzle-orm'
+import { db, clients, payments, activityLogs } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 
 const createPaymentSchema = z.object({
@@ -30,6 +30,14 @@ const listQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('desc'),
 })
 
+function getPaymentSortColumn(sort: string) {
+  switch (sort) {
+    case 'amount': return payments.amount
+    case 'createdAt': return payments.createdAt
+    default: return payments.date
+  }
+}
+
 export default async function paymentRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
 
@@ -50,55 +58,84 @@ export default async function paymentRoutes(app: FastifyInstance) {
 
     // Ensure user owns any specified client
     if (clientId) {
-      const client = await prisma.client.findUnique({
-        where: { id: clientId },
-        select: { userId: true },
-      })
+      const [client] = await db
+        .select({ userId: clients.userId })
+        .from(clients)
+        .where(eq(clients.id, clientId))
+        .limit(1)
       if (!client || client.userId !== userId) {
         return reply.code(403).send({ error: 'Forbidden' })
       }
     }
 
-    const where: Prisma.PaymentWhereInput = {
-      client: { userId },
-      ...(clientId && { clientId }),
-      ...(method && { method }),
-      ...((startDate || endDate) && {
-        date: {
-          ...(startDate && { gte: new Date(startDate) }),
-          ...(endDate && { lte: new Date(endDate) }),
-        },
-      }),
-    }
+    // Build conditions — filter by client.userId via join
+    const paymentConditions = []
+    if (clientId) paymentConditions.push(eq(payments.clientId, clientId))
+    if (method) paymentConditions.push(eq(payments.method, method))
+    if (startDate) paymentConditions.push(gte(payments.date, new Date(startDate)))
+    if (endDate) paymentConditions.push(lte(payments.date, new Date(endDate)))
 
-    const [payments, total, aggregate] = await Promise.all([
-      prisma.payment.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sort]: order },
-        include: {
-          client: { select: { id: true, name: true } },
-          user: { select: { id: true, name: true } },
-        },
-      }),
-      prisma.payment.count({ where }),
-      prisma.payment.aggregate({
-        where,
-        _sum: { amount: true },
-      }),
+    const sortCol = getPaymentSortColumn(sort)
+    const orderFn = order === 'asc' ? asc : desc
+
+    // We always join with clients to enforce user ownership
+    const clientCondition = eq(clients.userId, userId)
+
+    const [paymentRows, [{ total }], sumRow] = await Promise.all([
+      db
+        .select({
+          id: payments.id,
+          amount: payments.amount,
+          method: payments.method,
+          date: payments.date,
+          notes: payments.notes,
+          createdAt: payments.createdAt,
+          updatedAt: payments.updatedAt,
+          clientId: payments.clientId,
+          userId: payments.userId,
+          clientName: clients.name,
+        })
+        .from(payments)
+        .innerJoin(clients, and(eq(payments.clientId, clients.id), clientCondition))
+        .where(paymentConditions.length > 0 ? and(...paymentConditions) : undefined)
+        .orderBy(orderFn(sortCol))
+        .limit(limit)
+        .offset(skip),
+      db
+        .select({ total: count() })
+        .from(payments)
+        .innerJoin(clients, and(eq(payments.clientId, clients.id), clientCondition))
+        .where(paymentConditions.length > 0 ? and(...paymentConditions) : undefined),
+      db
+        .select({ totalAmount: sql<string>`sum(${payments.amount})` })
+        .from(payments)
+        .innerJoin(clients, and(eq(payments.clientId, clients.id), clientCondition))
+        .where(paymentConditions.length > 0 ? and(...paymentConditions) : undefined),
     ])
 
+    const formattedPayments = paymentRows.map((p) => ({
+      id: p.id,
+      amount: Number(p.amount),
+      method: p.method,
+      date: p.date,
+      notes: p.notes,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      clientId: p.clientId,
+      userId: p.userId,
+      client: { id: p.clientId, name: p.clientName },
+    }))
+
     return reply.send({
-      data: payments.map((p) => ({ ...p, amount: Number(p.amount) })),
+      data: formattedPayments,
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / limit),
       },
       summary: {
-        totalAmount: Number(aggregate._sum.amount ?? 0),
+        totalAmount: Number(sumRow[0]?.totalAmount ?? 0),
       },
     })
   })
@@ -118,10 +155,11 @@ export default async function paymentRoutes(app: FastifyInstance) {
     const { clientId, amount, method, date, notes } = result.data
 
     // Verify client ownership
-    const client = await prisma.client.findUnique({
-      where: { id: clientId },
-      select: { userId: true, name: true },
-    })
+    const [client] = await db
+      .select({ userId: clients.userId, name: clients.name })
+      .from(clients)
+      .where(eq(clients.id, clientId))
+      .limit(1)
 
     if (!client) {
       return reply.code(404).send({ error: 'Client not found' })
@@ -130,36 +168,39 @@ export default async function paymentRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const payment = await prisma.payment.create({
-      data: {
-        amount: new Prisma.Decimal(amount),
-        method,
-        date: new Date(date),
-        notes,
-        clientId,
-        userId,
-      },
-      include: {
-        client: { select: { id: true, name: true } },
-      },
+    const id = crypto.randomUUID()
+    await db.insert(payments).values({
+      id,
+      amount: String(amount),
+      method,
+      date: new Date(date),
+      notes,
+      clientId,
+      userId,
     })
 
-    await prisma.activityLog.create({
-      data: {
-        type: 'PAYMENT_ADDED',
-        metadata: {
-          paymentId: payment.id,
-          amount,
-          method,
-          clientName: client.name,
-        },
-        clientId,
-        userId,
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id)).limit(1)
+
+    const logId = crypto.randomUUID()
+    await db.insert(activityLogs).values({
+      id: logId,
+      type: 'PAYMENT_ADDED',
+      metadata: {
+        paymentId: payment.id,
+        amount,
+        method,
+        clientName: client.name,
       },
+      clientId,
+      userId,
     })
 
     return reply.code(201).send({
-      data: { ...payment, amount: Number(payment.amount) },
+      data: {
+        ...payment,
+        amount: Number(payment.amount),
+        client: { id: clientId, name: client.name },
+      },
     })
   })
 
@@ -176,47 +217,59 @@ export default async function paymentRoutes(app: FastifyInstance) {
       })
     }
 
-    const existing = await prisma.payment.findUnique({
-      where: { id },
-      include: { client: { select: { userId: true, name: true } } },
-    })
+    // Fetch payment with client info
+    const [existing] = await db
+      .select({
+        id: payments.id,
+        amount: payments.amount,
+        method: payments.method,
+        date: payments.date,
+        notes: payments.notes,
+        clientId: payments.clientId,
+        userId: payments.userId,
+        clientUserId: clients.userId,
+        clientName: clients.name,
+      })
+      .from(payments)
+      .innerJoin(clients, eq(payments.clientId, clients.id))
+      .where(eq(payments.id, id))
+      .limit(1)
 
     if (!existing) {
       return reply.code(404).send({ error: 'Payment not found' })
     }
-    if (existing.client.userId !== userId) {
+    if (existing.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
     const { amount, date, ...rest } = result.data
+    const updateData: Record<string, unknown> = { ...rest }
+    if (amount !== undefined) updateData.amount = String(amount)
+    if (date !== undefined) updateData.date = new Date(date)
 
-    const updated = await prisma.payment.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(amount !== undefined && { amount: new Prisma.Decimal(amount) }),
-        ...(date !== undefined && { date: new Date(date) }),
-      },
-      include: {
-        client: { select: { id: true, name: true } },
-      },
-    })
+    await db.update(payments).set(updateData).where(eq(payments.id, id))
 
-    await prisma.activityLog.create({
-      data: {
-        type: 'PAYMENT_UPDATED',
-        metadata: {
-          paymentId: id,
-          updatedFields: Object.keys(result.data),
-          clientName: existing.client.name,
-        },
-        clientId: existing.clientId,
-        userId,
+    const [updated] = await db.select().from(payments).where(eq(payments.id, id)).limit(1)
+
+    const logId = crypto.randomUUID()
+    await db.insert(activityLogs).values({
+      id: logId,
+      type: 'PAYMENT_UPDATED',
+      metadata: {
+        paymentId: id,
+        updatedFields: Object.keys(result.data),
+        clientName: existing.clientName,
       },
+      clientId: existing.clientId,
+      userId,
     })
 
     return reply.send({
-      data: { ...updated, amount: Number(updated.amount) },
+      data: {
+        ...updated,
+        amount: Number(updated.amount),
+        client: { id: existing.clientId, name: existing.clientName },
+      },
     })
   })
 
@@ -225,32 +278,41 @@ export default async function paymentRoutes(app: FastifyInstance) {
     const userId = request.user.sub
     const { id } = request.params as { id: string }
 
-    const existing = await prisma.payment.findUnique({
-      where: { id },
-      include: { client: { select: { userId: true, name: true } } },
-    })
+    const [existing] = await db
+      .select({
+        id: payments.id,
+        amount: payments.amount,
+        method: payments.method,
+        clientId: payments.clientId,
+        clientUserId: clients.userId,
+        clientName: clients.name,
+      })
+      .from(payments)
+      .innerJoin(clients, eq(payments.clientId, clients.id))
+      .where(eq(payments.id, id))
+      .limit(1)
 
     if (!existing) {
       return reply.code(404).send({ error: 'Payment not found' })
     }
-    if (existing.client.userId !== userId) {
+    if (existing.clientUserId !== userId) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    await prisma.payment.delete({ where: { id } })
+    await db.delete(payments).where(eq(payments.id, id))
 
-    await prisma.activityLog.create({
-      data: {
-        type: 'PAYMENT_DELETED',
-        metadata: {
-          paymentId: id,
-          amount: Number(existing.amount),
-          method: existing.method,
-          clientName: existing.client.name,
-        },
-        clientId: existing.clientId,
-        userId,
+    const logId = crypto.randomUUID()
+    await db.insert(activityLogs).values({
+      id: logId,
+      type: 'PAYMENT_DELETED',
+      metadata: {
+        paymentId: id,
+        amount: Number(existing.amount),
+        method: existing.method,
+        clientName: existing.clientName,
       },
+      clientId: existing.clientId,
+      userId,
     })
 
     return reply.code(204).send()

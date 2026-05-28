@@ -1,7 +1,8 @@
 import { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { prisma } from '../../lib/prisma'
+import { eq, and, ne } from 'drizzle-orm'
+import { db, users } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 
 const updateProfileSchema = z.object({
@@ -46,17 +47,21 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const { email, name, password } = result.data
 
-    const existing = await prisma.user.findUnique({ where: { email } })
+    const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1)
     if (existing) {
       return reply.code(409).send({ error: 'Email already in use' })
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)
+    const id = crypto.randomUUID()
 
-    const user = await prisma.user.create({
-      data: { email, name, password: hashedPassword },
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
-    })
+    await db.insert(users).values({ id, email, name, password: hashedPassword })
+
+    const [user] = await db
+      .select({ id: users.id, email: users.email, name: users.name, role: users.role, createdAt: users.createdAt })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1)
 
     const token = await reply.jwtSign({
       sub: user.id,
@@ -79,7 +84,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const { email, password } = result.data
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1)
     if (!user) {
       return reply.code(401).send({ error: 'Invalid email or password' })
     }
@@ -111,17 +116,18 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get('/me', { preHandler: authenticate }, async (request, reply) => {
     const userId = request.user.sub
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    })
+    const [user] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
 
     if (!user) {
       return reply.code(404).send({ error: 'User not found' })
@@ -141,16 +147,22 @@ export default async function authRoutes(app: FastifyInstance) {
     const { name, email } = result.data
 
     // Check email not taken by another user
-    const existing = await prisma.user.findFirst({ where: { email, NOT: { id: userId } } })
+    const [existing] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.email, email), ne(users.id, userId)))
+      .limit(1)
     if (existing) {
       return reply.code(409).send({ error: 'Email already in use by another account' })
     }
 
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: { name, email },
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
-    })
+    await db.update(users).set({ name, email }).where(eq(users.id, userId))
+
+    const [user] = await db
+      .select({ id: users.id, email: users.email, name: users.name, role: users.role, createdAt: users.createdAt })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
 
     return reply.send({ user })
   })
@@ -165,14 +177,14 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const { currentPassword, newPassword } = result.data
 
-    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
     if (!user) return reply.code(404).send({ error: 'User not found' })
 
     const valid = await bcrypt.compare(currentPassword, user.password)
     if (!valid) return reply.code(400).send({ error: 'Current password is incorrect' })
 
     const hashed = await bcrypt.hash(newPassword, 12)
-    await prisma.user.update({ where: { id: userId }, data: { password: hashed } })
+    await db.update(users).set({ password: hashed }).where(eq(users.id, userId))
 
     return reply.send({ message: 'Password updated successfully' })
   })

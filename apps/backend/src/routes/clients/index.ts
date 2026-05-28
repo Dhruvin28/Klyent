@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Prisma } from '@prisma/client'
-import { prisma } from '../../lib/prisma'
+import { eq, and, or, like, inArray, desc, asc, count, sql } from 'drizzle-orm'
+import { db, clients, payments, activityLogs } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 
 const createClientSchema = z.object({
@@ -33,6 +33,16 @@ const listQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('desc'),
 })
 
+// Map sort field names to actual column references
+function getClientSortColumn(sort: string) {
+  switch (sort) {
+    case 'name': return clients.name
+    case 'updatedAt': return clients.updatedAt
+    case 'totalDealAmount': return clients.totalDealAmount
+    default: return clients.createdAt
+  }
+}
+
 export default async function clientRoutes(app: FastifyInstance) {
   // All routes require authentication
   app.addHook('preHandler', authenticate)
@@ -52,45 +62,56 @@ export default async function clientRoutes(app: FastifyInstance) {
     const { search, status, page, limit, sort, order } = queryResult.data
     const skip = (page - 1) * limit
 
-    const where: Prisma.ClientWhereInput = {
-      userId,
-      ...(status && { status }),
-      ...(search && {
-        OR: [
-          { name: { contains: search } },
-          { email: { contains: search } },
-        ],
-      }),
+    // Build where conditions
+    const conditions = [eq(clients.userId, userId)]
+    if (status) conditions.push(eq(clients.status, status))
+    if (search) {
+      conditions.push(
+        or(
+          like(clients.name, `%${search}%`),
+          like(clients.email, `%${search}%`)
+        )!
+      )
     }
 
-    const [clients, total] = await Promise.all([
-      prisma.client.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sort]: order },
-        include: {
-          payments: {
-            select: { amount: true },
-          },
-          _count: {
-            select: { files: true, payments: true },
-          },
-        },
-      }),
-      prisma.client.count({ where }),
+    const whereClause = and(...conditions)
+
+    const sortCol = getClientSortColumn(sort)
+    const orderFn = order === 'asc' ? asc : desc
+
+    const [clientRows, [{ total }]] = await Promise.all([
+      db
+        .select()
+        .from(clients)
+        .where(whereClause)
+        .orderBy(orderFn(sortCol))
+        .limit(limit)
+        .offset(skip),
+      db.select({ total: count() }).from(clients).where(whereClause),
     ])
 
-    const clientsWithStats = clients.map((client) => {
-      const totalPaid = client.payments.reduce(
-        (sum, p) => sum + Number(p.amount),
-        0
-      )
+    // Get payment sums for these clients
+    const clientIds = clientRows.map((c) => c.id)
+    const paymentSums =
+      clientIds.length > 0
+        ? await db
+            .select({
+              clientId: payments.clientId,
+              totalPaid: sql<string>`sum(${payments.amount})`,
+            })
+            .from(payments)
+            .where(inArray(payments.clientId, clientIds))
+            .groupBy(payments.clientId)
+        : []
+
+    const paymentSumMap = new Map(paymentSums.map((p) => [p.clientId, Number(p.totalPaid ?? 0)]))
+
+    const clientsWithStats = clientRows.map((client) => {
+      const totalPaid = paymentSumMap.get(client.id) ?? 0
       const remainingBalance = Number(client.totalDealAmount) - totalPaid
-      const { payments, ...rest } = client
       return {
-        ...rest,
-        totalDealAmount: Number(rest.totalDealAmount),
+        ...client,
+        totalDealAmount: Number(client.totalDealAmount),
         totalPaid,
         remainingBalance,
       }
@@ -101,8 +122,8 @@ export default async function clientRoutes(app: FastifyInstance) {
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: Number(total),
+        totalPages: Math.ceil(Number(total) / limit),
       },
     })
   })
@@ -120,22 +141,24 @@ export default async function clientRoutes(app: FastifyInstance) {
     }
 
     const { totalDealAmount, ...rest } = result.data
+    const id = crypto.randomUUID()
 
-    const client = await prisma.client.create({
-      data: {
-        ...rest,
-        totalDealAmount: new Prisma.Decimal(totalDealAmount ?? 0),
-        userId,
-      },
+    await db.insert(clients).values({
+      id,
+      ...rest,
+      totalDealAmount: String(totalDealAmount ?? 0),
+      userId,
     })
 
-    await prisma.activityLog.create({
-      data: {
-        type: 'CLIENT_CREATED',
-        metadata: { clientName: client.name },
-        clientId: client.id,
-        userId,
-      },
+    const [client] = await db.select().from(clients).where(eq(clients.id, id)).limit(1)
+
+    const logId = crypto.randomUUID()
+    await db.insert(activityLogs).values({
+      id: logId,
+      type: 'CLIENT_CREATED',
+      metadata: { clientName: client.name },
+      clientId: client.id,
+      userId,
     })
 
     return reply.code(201).send({ data: client })
@@ -146,28 +169,7 @@ export default async function clientRoutes(app: FastifyInstance) {
     const userId = request.user.sub
     const { id } = request.params as { id: string }
 
-    const client = await prisma.client.findUnique({
-      where: { id },
-      include: {
-        payments: {
-          orderBy: { date: 'desc' },
-        },
-        files: {
-          include: {
-            versions: {
-              where: { isActive: true },
-              orderBy: { versionNumber: 'desc' },
-              take: 1,
-            },
-            _count: { select: { versions: true, comments: true } },
-          },
-          orderBy: { updatedAt: 'desc' },
-        },
-        _count: {
-          select: { payments: true, files: true, activityLogs: true },
-        },
-      },
-    })
+    const [client] = await db.select().from(clients).where(eq(clients.id, id)).limit(1)
 
     if (!client) {
       return reply.code(404).send({ error: 'Client not found' })
@@ -177,14 +179,21 @@ export default async function clientRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const totalPaid = client.payments.reduce((sum, p) => sum + Number(p.amount), 0)
+    // Fetch payments ordered by date desc
+    const clientPayments = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.clientId, id))
+      .orderBy(desc(payments.date))
+
+    const totalPaid = clientPayments.reduce((sum, p) => sum + Number(p.amount), 0)
     const remainingBalance = Number(client.totalDealAmount) - totalPaid
 
     return reply.send({
       data: {
         ...client,
         totalDealAmount: Number(client.totalDealAmount),
-        payments: client.payments.map((p) => ({ ...p, amount: Number(p.amount) })),
+        payments: clientPayments.map((p) => ({ ...p, amount: Number(p.amount) })),
         totalPaid,
         remainingBalance,
       },
@@ -204,7 +213,7 @@ export default async function clientRoutes(app: FastifyInstance) {
       })
     }
 
-    const existing = await prisma.client.findUnique({ where: { id } })
+    const [existing] = await db.select().from(clients).where(eq(clients.id, id)).limit(1)
     if (!existing) {
       return reply.code(404).send({ error: 'Client not found' })
     }
@@ -215,34 +224,30 @@ export default async function clientRoutes(app: FastifyInstance) {
     const { status, totalDealAmount, ...rest } = result.data
     const statusChanged = status !== undefined && status !== existing.status
 
-    const updated = await prisma.client.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(status && { status }),
-        ...(totalDealAmount !== undefined && {
-          totalDealAmount: new Prisma.Decimal(totalDealAmount),
-        }),
-      },
-    })
+    const updateData: Record<string, unknown> = { ...rest }
+    if (status) updateData.status = status
+    if (totalDealAmount !== undefined) updateData.totalDealAmount = String(totalDealAmount)
 
+    await db.update(clients).set(updateData).where(eq(clients.id, id))
+
+    const [updated] = await db.select().from(clients).where(eq(clients.id, id)).limit(1)
+
+    const logId = crypto.randomUUID()
     if (statusChanged) {
-      await prisma.activityLog.create({
-        data: {
-          type: 'STATUS_CHANGED',
-          metadata: { from: existing.status, to: status },
-          clientId: id,
-          userId,
-        },
+      await db.insert(activityLogs).values({
+        id: logId,
+        type: 'STATUS_CHANGED',
+        metadata: { from: existing.status, to: status },
+        clientId: id,
+        userId,
       })
     } else {
-      await prisma.activityLog.create({
-        data: {
-          type: 'CLIENT_UPDATED',
-          metadata: { updatedFields: Object.keys(result.data) },
-          clientId: id,
-          userId,
-        },
+      await db.insert(activityLogs).values({
+        id: logId,
+        type: 'CLIENT_UPDATED',
+        metadata: { updatedFields: Object.keys(result.data) },
+        clientId: id,
+        userId,
       })
     }
 
@@ -254,7 +259,7 @@ export default async function clientRoutes(app: FastifyInstance) {
     const userId = request.user.sub
     const { id } = request.params as { id: string }
 
-    const existing = await prisma.client.findUnique({ where: { id } })
+    const [existing] = await db.select().from(clients).where(eq(clients.id, id)).limit(1)
     if (!existing) {
       return reply.code(404).send({ error: 'Client not found' })
     }
@@ -262,7 +267,7 @@ export default async function clientRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    await prisma.client.delete({ where: { id } })
+    await db.delete(clients).where(eq(clients.id, id))
 
     return reply.code(204).send()
   })
@@ -272,10 +277,11 @@ export default async function clientRoutes(app: FastifyInstance) {
     const userId = request.user.sub
     const { id } = request.params as { id: string }
 
-    const client = await prisma.client.findUnique({
-      where: { id },
-      select: { userId: true, totalDealAmount: true, status: true },
-    })
+    const [client] = await db
+      .select({ userId: clients.userId, totalDealAmount: clients.totalDealAmount, status: clients.status })
+      .from(clients)
+      .where(eq(clients.id, id))
+      .limit(1)
 
     if (!client) {
       return reply.code(404).send({ error: 'Client not found' })
@@ -284,21 +290,24 @@ export default async function clientRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
 
-    const [paymentAgg, paymentCount, byMethod] = await Promise.all([
-      prisma.payment.aggregate({
-        where: { clientId: id },
-        _sum: { amount: true },
-      }),
-      prisma.payment.count({ where: { clientId: id } }),
-      prisma.payment.groupBy({
-        by: ['method'],
-        where: { clientId: id },
-        _sum: { amount: true },
-        _count: true,
-      }),
+    const [paymentSumRow, [{ paymentCount }], byMethod] = await Promise.all([
+      db
+        .select({ total: sql<string>`sum(${payments.amount})` })
+        .from(payments)
+        .where(eq(payments.clientId, id)),
+      db.select({ paymentCount: count() }).from(payments).where(eq(payments.clientId, id)),
+      db
+        .select({
+          method: payments.method,
+          total: sql<string>`sum(${payments.amount})`,
+          count: count(),
+        })
+        .from(payments)
+        .where(eq(payments.clientId, id))
+        .groupBy(payments.method),
     ])
 
-    const totalPaid = Number(paymentAgg._sum.amount ?? 0)
+    const totalPaid = Number(paymentSumRow[0]?.total ?? 0)
     const totalDeal = Number(client.totalDealAmount)
     const remainingBalance = totalDeal - totalPaid
 
@@ -307,12 +316,12 @@ export default async function clientRoutes(app: FastifyInstance) {
         totalDealAmount: totalDeal,
         totalPaid,
         remainingBalance,
-        paymentCount,
+        paymentCount: Number(paymentCount),
         status: client.status,
         paymentsByMethod: byMethod.map((m) => ({
           method: m.method,
-          total: Number(m._sum.amount ?? 0),
-          count: m._count,
+          total: Number(m.total ?? 0),
+          count: Number(m.count),
         })),
       },
     })
