@@ -38,6 +38,21 @@ jobs:
           cp -r apps/frontend/dist deploy/apps/frontend/dist
           cp package.json deploy/package.json
           cp apps/backend/package.json deploy/apps/backend/package.json
+          # Copy backend's own node_modules if they exist (non-hoisted workspace deps)
+          if [ -d apps/backend/node_modules ]; then
+            cp -r apps/backend/node_modules deploy/apps/backend/node_modules
+          fi
+
+      - name: Configure Azure Web App settings
+        uses: azure/appservice-settings@v1
+        with:
+          app-name: 'knowyourlabel'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-settings-json: |
+            [
+              { "name": "NODE_ENV",      "value": "production",  "slotSetting": false },
+              { "name": "WEBSITES_PORT", "value": "3001",        "slotSetting": false }
+            ]
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
@@ -45,3 +60,4 @@ jobs:
           app-name: knowyourlabel
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: deploy
+          startup-command: 'node apps/backend/dist/migrate.js && node apps/backend/dist/index.js'
