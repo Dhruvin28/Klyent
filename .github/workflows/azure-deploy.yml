@@ -26,19 +26,18 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Install backend production dependencies
-        run: npm install --omit=dev
-        working-directory: apps/backend
+      - name: Remove dev dependencies
+        run: npm prune --omit=dev
 
       - name: Package deployment artifacts
         run: |
           mkdir -p deploy/apps/backend
           mkdir -p deploy/apps/frontend
+          cp -r node_modules deploy/node_modules
           cp -r apps/backend/dist deploy/apps/backend/dist
-          cp -r apps/backend/node_modules deploy/apps/backend/node_modules
-          cp apps/backend/package.json deploy/apps/backend/package.json
           cp -r apps/frontend/dist deploy/apps/frontend/dist
           cp package.json deploy/package.json
+          cp apps/backend/package.json deploy/apps/backend/package.json
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
