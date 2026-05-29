@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, CreditCard } from 'lucide-react'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -23,13 +24,25 @@ const methodColors: Record<PaymentMethod, string> = {
 }
 
 export function PaymentsPage() {
-  const [clientId, setClientId] = useState<string>('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [clientId, setClientId] = useState<string>(searchParams.get('clientId') ?? '')
   const [method, setMethod] = useState<string>('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [page, setPage] = useState(1)
   const [addOpen, setAddOpen] = useState(false)
   const limit = 20
+
+  // Auto-open add dialog when navigated from client table quick-pay icon
+  useEffect(() => {
+    if (searchParams.get('add') === 'true') {
+      setAddOpen(true)
+      // Clean the param from URL without re-render loop
+      const next = new URLSearchParams(searchParams)
+      next.delete('add')
+      setSearchParams(next, { replace: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: paymentsData, isLoading } = usePayments({
     clientId: clientId || undefined,
@@ -53,6 +66,7 @@ export function PaymentsPage() {
     setStartDate('')
     setEndDate('')
     setPage(1)
+    setSearchParams({}, { replace: true })
   }
 
   return (
@@ -229,6 +243,7 @@ export function PaymentsPage() {
 
       {/* Add Payment dialog */}
       <PaymentForm
+        clientId={clientId || undefined}
         clients={clientsData?.data ?? []}
         open={addOpen}
         onOpenChange={setAddOpen}

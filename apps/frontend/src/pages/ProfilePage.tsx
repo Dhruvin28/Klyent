@@ -1,23 +1,32 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { User, Lock, Shield, Calendar, Loader2, Check, X } from 'lucide-react'
+import { User, Lock, Shield, Calendar, Loader2, Check, X, Building2, Upload, Globe, Phone, MapPin, FileText } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
-import { useUpdateProfile, useChangePassword } from '@/hooks/useProfile'
+import { useUpdateProfile, useChangePassword, useUploadLogo } from '@/hooks/useProfile'
 import { useAuthStore } from '@/store/auth.store'
 import { formatDate } from '@/lib/utils'
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Enter a valid email address'),
+})
+
+const companySchema = z.object({
+  companyName: z.string().max(255).optional(),
+  companyPhone: z.string().max(50).optional(),
+  companyAddress: z.string().optional(),
+  companyWebsite: z.string().max(500).optional(),
+  companyGstin: z.string().max(20).optional(),
 })
 
 const passwordSchema = z.object({
@@ -34,6 +43,7 @@ const passwordSchema = z.object({
 })
 
 type ProfileForm = z.infer<typeof profileSchema>
+type CompanyForm = z.infer<typeof companySchema>
 type PasswordForm = z.infer<typeof passwordSchema>
 
 function PasswordCriteria({ password }: { password: string }) {
@@ -58,12 +68,15 @@ function PasswordCriteria({ password }: { password: string }) {
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user)
   const updateProfile = useUpdateProfile()
+  const uploadLogo = useUploadLogo()
   const changePassword = useChangePassword()
   const { toast } = useToast()
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   const initials = user?.name
     ?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) ?? 'K'
 
+  // Profile form
   const {
     register: regProfile,
     handleSubmit: handleProfileSubmit,
@@ -74,10 +87,24 @@ export function ProfilePage() {
     defaultValues: { name: user?.name ?? '', email: user?.email ?? '' },
   })
 
-  useEffect(() => {
-    if (user) resetProfile({ name: user.name, email: user.email })
-  }, [user, resetProfile])
+  // Company form
+  const {
+    register: regCompany,
+    handleSubmit: handleCompanySubmit,
+    reset: resetCompany,
+    formState: { errors: companyErrors, isSubmitting: companySubmitting, isDirty: companyDirty },
+  } = useForm<CompanyForm>({
+    resolver: zodResolver(companySchema),
+    defaultValues: {
+      companyName: user?.companyName ?? '',
+      companyPhone: user?.companyPhone ?? '',
+      companyAddress: user?.companyAddress ?? '',
+      companyWebsite: user?.companyWebsite ?? '',
+      companyGstin: user?.companyGstin ?? '',
+    },
+  })
 
+  // Password form
   const {
     register: regPassword,
     handleSubmit: handlePasswordSubmit,
@@ -88,14 +115,64 @@ export function ProfilePage() {
 
   const newPasswordValue = watch('newPassword', '')
 
+  useEffect(() => {
+    if (user) {
+      resetProfile({ name: user.name, email: user.email })
+      resetCompany({
+        companyName: user.companyName ?? '',
+        companyPhone: user.companyPhone ?? '',
+        companyAddress: user.companyAddress ?? '',
+        companyWebsite: user.companyWebsite ?? '',
+        companyGstin: user.companyGstin ?? '',
+      })
+    }
+  }, [user, resetProfile, resetCompany])
+
   const onProfileSave = async (data: ProfileForm) => {
     try {
-      await updateProfile.mutateAsync(data)
+      await updateProfile.mutateAsync({
+        ...data,
+        companyName: user?.companyName,
+        companyPhone: user?.companyPhone,
+        companyAddress: user?.companyAddress,
+        companyWebsite: user?.companyWebsite,
+        companyGstin: user?.companyGstin,
+      })
       toast({ title: 'Profile updated', description: 'Your name and email have been saved.' })
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to update profile.'
       toast({ title: 'Update failed', description: msg, variant: 'destructive' })
     }
+  }
+
+  const onCompanySave = async (data: CompanyForm) => {
+    try {
+      await updateProfile.mutateAsync({
+        name: user?.name ?? '',
+        email: user?.email ?? '',
+        companyName: data.companyName || null,
+        companyPhone: data.companyPhone || null,
+        companyAddress: data.companyAddress || null,
+        companyWebsite: data.companyWebsite || null,
+        companyGstin: data.companyGstin || null,
+      })
+      toast({ title: 'Company info updated', description: 'Company profile has been saved.' })
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to update company info.'
+      toast({ title: 'Update failed', description: msg, variant: 'destructive' })
+    }
+  }
+
+  const onLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      await uploadLogo.mutateAsync(file)
+      toast({ title: 'Logo uploaded', description: 'Company logo has been updated.' })
+    } catch {
+      toast({ title: 'Upload failed', description: 'Failed to upload logo. Max 50MB, JPEG/PNG/WebP/SVG only.', variant: 'destructive' })
+    }
+    e.target.value = ''
   }
 
   const onPasswordSave = async (data: PasswordForm) => {
@@ -138,7 +215,7 @@ export function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Edit profile */}
+      {/* Edit personal profile */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -161,6 +238,97 @@ export function ProfilePage() {
             </div>
             <Button type="submit" disabled={profileSubmitting || !profileDirty}>
               {profileSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Changes'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Company profile */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Company Profile
+          </CardTitle>
+          <CardDescription>Your company info appears on the dashboard and payment reminders.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Logo upload */}
+          <div className="flex items-center gap-4">
+            <div className="relative h-20 w-20 shrink-0 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted flex items-center justify-center">
+              {user?.companyLogoUrl ? (
+                <img src={user.companyLogoUrl} alt="Company logo" className="h-full w-full object-contain p-1" />
+              ) : (
+                <Building2 className="h-8 w-8 text-muted-foreground/40" />
+              )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Company Logo</p>
+              <p className="text-xs text-muted-foreground">JPEG, PNG, WebP or SVG · Shown on dashboard</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2 mt-1"
+                disabled={uploadLogo.isPending}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                {uploadLogo.isPending
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Uploading...</>
+                  : <><Upload className="h-3.5 w-3.5" />{user?.companyLogoUrl ? 'Change Logo' : 'Upload Logo'}</>
+                }
+              </Button>
+              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={onLogoChange} />
+            </div>
+          </div>
+
+          <form onSubmit={handleCompanySubmit(onCompanySave)} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="companyName" className="flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                Company Name
+              </Label>
+              <Input id="companyName" placeholder="Acme Pvt. Ltd." {...regCompany('companyName')} />
+              {companyErrors.companyName && <p className="text-xs text-destructive">{companyErrors.companyName.message}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="companyPhone" className="flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                  Company Phone
+                </Label>
+                <Input id="companyPhone" placeholder="+91 98765 43210" {...regCompany('companyPhone')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="companyWebsite" className="flex items-center gap-1.5">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  Website
+                </Label>
+                <Input id="companyWebsite" placeholder="https://yourcompany.com" {...regCompany('companyWebsite')} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="companyAddress" className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                Address
+              </Label>
+              <Textarea id="companyAddress" placeholder="123 Business Park, Mumbai, Maharashtra 400001" rows={2} {...regCompany('companyAddress')} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="companyGstin" className="flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                GSTIN
+              </Label>
+              <Input id="companyGstin" placeholder="22AAAAA0000A1Z5" {...regCompany('companyGstin')} />
+            </div>
+
+            <Button type="submit" disabled={companySubmitting || !companyDirty}>
+              {companySubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : 'Save Company Info'}
             </Button>
           </form>
         </CardContent>

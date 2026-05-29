@@ -12,13 +12,17 @@ interface StatsCardProps {
   }
   className?: string
   iconClassName?: string
+  onClick?: () => void
 }
 
-export function StatsCard({ icon: Icon, label, value, change, className, iconClassName }: StatsCardProps) {
+export function StatsCard({ icon: Icon, label, value, change, className, iconClassName, onClick }: StatsCardProps) {
   const isPositive = change && change.value >= 0
 
   return (
-    <Card className={cn('', className)}>
+    <Card
+      className={cn('', onClick && 'cursor-pointer hover:shadow-md transition-shadow', className)}
+      onClick={onClick}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
         <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg bg-muted', iconClassName)}>

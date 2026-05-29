@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpDown, Eye, Pencil, Trash2 } from 'lucide-react'
+import { ArrowUpDown, Eye, Pencil, Trash2, PlusCircle, Bell } from 'lucide-react'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClientStatusBadge } from './ClientStatusBadge'
 import { ClientForm } from './ClientForm'
+import { PaymentReminderDialog } from './PaymentReminderDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { formatCurrency } from '@/lib/utils'
 import { useDeleteClient } from '@/hooks/useClients'
@@ -26,6 +27,7 @@ export function ClientTable({ clients, isLoading, sortBy, sortOrder, onSort }: C
   const navigate = useNavigate()
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [reminderClient, setReminderClient] = useState<Client | null>(null)
   const deleteClient = useDeleteClient()
   const { toast } = useToast()
 
@@ -118,6 +120,24 @@ export function ClientTable({ clients, isLoading, sortBy, sortOrder, onSort }: C
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+                      title="Record payment"
+                      onClick={() => navigate(`/payments?clientId=${client.id}&add=true`)}
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                      title="Send payment reminder"
+                      onClick={() => setReminderClient(client)}
+                    >
+                      <Bell className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="h-8 w-8"
                       onClick={() => navigate(`/clients/${client.id}`)}
                     >
@@ -156,6 +176,12 @@ export function ClientTable({ clients, isLoading, sortBy, sortOrder, onSort }: C
           onOpenChange={(open) => { if (!open) setEditingClient(null) }}
         />
       )}
+
+      <PaymentReminderDialog
+        client={reminderClient}
+        open={!!reminderClient}
+        onOpenChange={(open) => { if (!open) setReminderClient(null) }}
+      />
 
       <ConfirmDialog
         open={!!deletingId}

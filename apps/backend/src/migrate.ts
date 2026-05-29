@@ -101,6 +101,16 @@ const CREATE_STATEMENTS = [
   )`,
 ]
 
+// Columns to add to existing tables: [table, column, definition]
+const ALTER_COLUMNS: [string, string, string][] = [
+  ['users', 'company_name',     'VARCHAR(255)'],
+  ['users', 'company_logo_url', 'TEXT'],
+  ['users', 'company_phone',    'VARCHAR(50)'],
+  ['users', 'company_address',  'TEXT'],
+  ['users', 'company_website',  'VARCHAR(500)'],
+  ['users', 'company_gstin',    'VARCHAR(20)'],
+]
+
 export async function runMigrations() {
   console.log('[migrate] Connecting to database...')
 
@@ -117,6 +127,19 @@ export async function runMigrations() {
 
   for (const sql of CREATE_STATEMENTS) {
     await connection.execute(sql)
+  }
+
+  // Add new columns only when they don't already exist (compatible with all MySQL versions)
+  for (const [table, column, definition] of ALTER_COLUMNS) {
+    const [rows] = await connection.execute(
+      `SELECT COUNT(*) AS cnt FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+      [table, column]
+    ) as [{ cnt: number }[], unknown]
+    if (rows[0].cnt === 0) {
+      await connection.execute(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`)
+      console.log(`[migrate] Added column ${table}.${column}`)
+    }
   }
 
   console.log('[migrate] All tables created/verified successfully')

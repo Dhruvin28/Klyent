@@ -11,10 +11,23 @@ export function useMe() {
 
 export function useUpdateProfile() {
   const qc = useQueryClient()
-  const { user, setAuth } = useAuthStore()
   const token = useAuthStore((s) => s.token)
+  const setAuth = useAuthStore((s) => s.setAuth)
   return useMutation({
     mutationFn: profileApi.updateProfile,
+    onSuccess: (updated) => {
+      qc.setQueryData(['me'], updated)
+      if (token) setAuth(token, updated)
+    },
+  })
+}
+
+export function useUploadLogo() {
+  const qc = useQueryClient()
+  const token = useAuthStore((s) => s.token)
+  const setAuth = useAuthStore((s) => s.setAuth)
+  return useMutation({
+    mutationFn: profileApi.uploadLogo,
     onSuccess: (updated) => {
       qc.setQueryData(['me'], updated)
       if (token) setAuth(token, updated)

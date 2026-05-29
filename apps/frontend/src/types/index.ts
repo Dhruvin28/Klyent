@@ -17,6 +17,12 @@ export interface User {
   email: string
   name: string
   role: Role
+  companyName?: string | null
+  companyLogoUrl?: string | null
+  companyPhone?: string | null
+  companyAddress?: string | null
+  companyWebsite?: string | null
+  companyGstin?: string | null
   createdAt: string
 }
 
