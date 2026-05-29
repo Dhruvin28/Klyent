@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { eq, and, desc, count } from 'drizzle-orm'
 import { db, clients, files, fileVersions, comments, activityLogs, users } from '../../db'
-import { s3Client, getPresignedDownloadUrl, deleteS3Object } from '../../lib/s3'
+import { s3Client, deleteS3Object } from '../../lib/s3'
 import { authenticate } from '../../middleware/authenticate'
 import { config } from '../../config'
 
@@ -203,7 +203,7 @@ export default async function fileRoutes(app: FastifyInstance) {
       latestVersionNumber = latestVersion?.versionNumber ?? 0
     }
 
-    const isNewVersion = existingFile !== null
+    const isNewVersion = existingFile !== undefined
     const nextVersionNumber = latestVersionNumber + 1
 
     // Create File record first if new
@@ -282,9 +282,9 @@ export default async function fileRoutes(app: FastifyInstance) {
     const [version] = await db.select().from(fileVersions).where(eq(fileVersions.id, versionId)).limit(1)
 
     // Update file updatedAt (and description if provided)
-    const fileUpdate: Record<string, unknown> = { updatedAt: new Date() }
-    if (description !== undefined) fileUpdate.description = description
-    await db.update(files).set(fileUpdate).where(eq(files.id, fileId))
+    await db.update(files).set(
+      description !== undefined ? { description, updatedAt: new Date() } : { updatedAt: new Date() }
+    ).where(eq(files.id, fileId))
 
     // Log activity
     const logId = crypto.randomUUID()
@@ -412,7 +412,7 @@ export default async function fileRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'No active version found' })
     }
 
-    const url = await getPresignedDownloadUrl(activeVersion.s3Key)
+    const url = `${config.r2.publicUrl}/${activeVersion.s3Key}`
     return reply.redirect(302, url)
   })
 
@@ -451,12 +451,11 @@ export default async function fileRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'No active version found' })
     }
 
-    const url = await getPresignedDownloadUrl(activeVersion.s3Key, 900) // 15-minute URL for preview
+    const url = `${config.r2.publicUrl}/${activeVersion.s3Key}`
 
     return reply.send({
       data: {
         url,
-        expiresIn: 900,
         file: {
           id: file.id,
           name: file.name,
@@ -542,7 +541,7 @@ export default async function fileRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'No active version available' })
     }
 
-    const url = await getPresignedDownloadUrl(activeVersion.s3Key, 3600)
+    const url = `${config.r2.publicUrl}/${activeVersion.s3Key}`
 
     return reply.send({
       data: {
@@ -555,7 +554,6 @@ export default async function fileRoutes(app: FastifyInstance) {
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
         downloadUrl: url,
-        expiresIn: 3600,
       },
     })
   })
