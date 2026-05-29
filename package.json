@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=apps/backend\" \"npm run dev --workspace=apps/frontend\"",
     "build": "npm run build --workspace=apps/frontend && npm run build --workspace=apps/backend",
-    "start": "node apps/backend/dist/migrate.js && node apps/backend/dist/index.js",
+    "start": "node apps/backend/dist/index.js",
     "db:migrate": "npm run db:migrate --workspace=apps/backend",
     "db:push": "npm run db:push --workspace=apps/backend",
     "db:seed": "npm run db:seed --workspace=apps/backend",

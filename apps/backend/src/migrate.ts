@@ -101,12 +101,7 @@ const CREATE_STATEMENTS = [
   )`,
 ]
 
-async function runMigrations() {
-  if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    require('dotenv').config()
-  }
-
+export async function runMigrations() {
   console.log('[migrate] Connecting to database...')
 
   const connection = await mysql.createConnection({
@@ -127,8 +122,3 @@ async function runMigrations() {
   console.log('[migrate] All tables created/verified successfully')
   await connection.end()
 }
-
-runMigrations().catch((err) => {
-  console.error('[migrate] Migration failed:', err)
-  process.exit(1)
-})

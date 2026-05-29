@@ -3,8 +3,11 @@ if (process.env.NODE_ENV !== 'production') {
 }
 import { buildApp } from './app'
 import { config } from './config'
+import { runMigrations } from './migrate'
 
 async function main() {
+  await runMigrations()
+
   const app = await buildApp()
 
   // Graceful shutdown handlers
