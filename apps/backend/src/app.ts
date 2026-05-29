@@ -97,10 +97,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Serve frontend static files in production
   const frontendDist = path.join(__dirname, '../../frontend/dist')
   if (process.env.NODE_ENV === 'production' && fs.existsSync(frontendDist)) {
-    await app.register(staticPlugin, { root: frontendDist, prefix: '/', decorateReply: false })
+    await app.register(staticPlugin, { root: frontendDist, prefix: '/' })
     // SPA fallback — serve index.html for all non-API routes
     app.setNotFoundHandler((_request, reply) => {
-      reply.sendFile('index.html', frontendDist)
+      reply.sendFile('index.html')
     })
   }
 
