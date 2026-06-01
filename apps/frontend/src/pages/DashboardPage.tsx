@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { IndianRupee, Users, Clock, TrendingUp } from 'lucide-react'
+import { IndianRupee, Clock, TrendingUp, Briefcase } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { RevenueChart } from '@/components/dashboard/RevenueChart'
 import { ClientGrowthChart } from '@/components/dashboard/ClientGrowthChart'
@@ -23,8 +23,8 @@ export function DashboardPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
                 <Skeleton className="h-4 w-24" />
@@ -36,6 +36,7 @@ export function DashboardPage() {
             </Card>
           ))}
         </div>
+        <Skeleton className="h-24 w-full rounded-lg" />
         <Skeleton className="h-80 w-full rounded-lg" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Skeleton className="h-80 rounded-lg" />
@@ -74,21 +75,14 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Client stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatsCard
           icon={IndianRupee}
           label="Total Revenue"
           value={formatCurrency(stats?.totalRevenue ?? 0)}
           iconClassName="bg-green-100 dark:bg-green-900/30"
           onClick={() => setActiveTile('revenue')}
-        />
-        <StatsCard
-          icon={Users}
-          label="Total Clients"
-          value={stats?.totalClients ?? 0}
-          iconClassName="bg-blue-100 dark:bg-blue-900/30"
-          onClick={() => setActiveTile('clients')}
         />
         <StatsCard
           icon={Clock}
@@ -105,6 +99,33 @@ export function DashboardPage() {
           onClick={() => setActiveTile('active')}
         />
       </div>
+
+      {/* Freelance summary */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Freelance Overview</span>
+            {(stats?.freelanceActiveProjects ?? 0) > 0 && (
+              <span className="text-xs text-muted-foreground">· {stats?.freelanceActiveProjects} active project{stats!.freelanceActiveProjects !== 1 ? 's' : ''}</span>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Total Billed</p>
+              <p className="text-lg font-bold mt-0.5">{formatCurrency(stats?.freelanceBilled ?? 0)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Paid</p>
+              <p className="text-lg font-bold mt-0.5 text-green-600 dark:text-green-400">{formatCurrency(stats?.freelancePaid ?? 0)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Pending</p>
+              <p className="text-lg font-bold mt-0.5 text-orange-600 dark:text-orange-400">{formatCurrency(stats?.freelancePending ?? 0)}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Revenue chart */}
       <RevenueChart data={stats?.monthlyRevenue ?? []} />

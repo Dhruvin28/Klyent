@@ -13,6 +13,7 @@ import paymentRoutes from './routes/payments'
 import fileRoutes from './routes/files'
 import dashboardRoutes from './routes/dashboard'
 import activityRoutes from './routes/activity'
+import freelanceRoutes from './routes/freelance'
 
 // Augment FastifyRequest to include JWT user payload
 declare module '@fastify/jwt' {
@@ -93,6 +94,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(fileRoutes, { prefix: '/api/files' })
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' })
   await app.register(activityRoutes, { prefix: '/api/activity' })
+  await app.register(freelanceRoutes, { prefix: '/api/freelance' })
 
   // Serve frontend static files in production
   const frontendDist = path.join(__dirname, '../../frontend/dist')

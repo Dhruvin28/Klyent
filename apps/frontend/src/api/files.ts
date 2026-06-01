@@ -2,18 +2,19 @@ import { api } from '@/lib/axios'
 import type { File, FileVersion, Comment } from '@/types'
 
 export const filesApi = {
-  getFiles: async (clientId: string): Promise<File[]> => {
-    const res = await api.get<{ data: File[] }>('/files', { params: { clientId } })
+  getFiles: async (params: { clientId?: string; freelanceProjectId?: string }): Promise<File[]> => {
+    const res = await api.get<{ data: File[] }>('/files', { params })
     return res.data.data
   },
 
   uploadFile: async (
-    clientId: string,
+    ownerParams: { clientId?: string; freelanceProjectId?: string },
     file: globalThis.File,
     options?: { name?: string; description?: string; onProgress?: (progress: number) => void }
   ): Promise<File> => {
     const formData = new FormData()
-    formData.append('clientId', clientId)
+    if (ownerParams.clientId) formData.append('clientId', ownerParams.clientId)
+    if (ownerParams.freelanceProjectId) formData.append('freelanceProjectId', ownerParams.freelanceProjectId)
     if (options?.name) formData.append('name', options.name)
     if (options?.description) formData.append('description', options.description)
     formData.append('file', file)

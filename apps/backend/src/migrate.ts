@@ -38,10 +38,12 @@ const CREATE_STATEMENTS = [
     \`notes\` TEXT,
     \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    \`client_id\` VARCHAR(128) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`freelance_project_id\` VARCHAR(128),
     \`user_id\` VARCHAR(128) NOT NULL,
     PRIMARY KEY (\`id\`),
     INDEX \`payments_client_id_idx\` (\`client_id\`),
+    INDEX \`payments_freelance_project_id_idx\` (\`freelance_project_id\`),
     INDEX \`payments_user_id_idx\` (\`user_id\`),
     INDEX \`payments_date_idx\` (\`date\`)
   )`,
@@ -51,13 +53,15 @@ const CREATE_STATEMENTS = [
     \`name\` VARCHAR(500) NOT NULL,
     \`description\` TEXT,
     \`mime_type\` VARCHAR(255) NOT NULL,
-    \`client_id\` VARCHAR(128) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`freelance_project_id\` VARCHAR(128),
     \`share_token\` VARCHAR(128),
     \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (\`id\`),
     UNIQUE INDEX \`files_share_token_idx\` (\`share_token\`),
-    INDEX \`files_client_id_idx\` (\`client_id\`)
+    INDEX \`files_client_id_idx\` (\`client_id\`),
+    INDEX \`files_freelance_project_id_idx\` (\`freelance_project_id\`)
   )`,
 
   `CREATE TABLE IF NOT EXISTS \`file_versions\` (
@@ -99,6 +103,36 @@ const CREATE_STATEMENTS = [
     INDEX \`activity_logs_user_id_idx\` (\`user_id\`),
     INDEX \`activity_logs_created_at_idx\` (\`created_at\`)
   )`,
+
+  `CREATE TABLE IF NOT EXISTS \`freelance_projects\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`client_name\` VARCHAR(200) NOT NULL,
+    \`work_type\` VARCHAR(200) NOT NULL,
+    \`charge_type\` VARCHAR(100) NOT NULL,
+    \`rate\` DECIMAL(15,2) NOT NULL,
+    \`status\` ENUM('ACTIVE','COMPLETED') NOT NULL DEFAULT 'ACTIVE',
+    \`notes\` TEXT,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`freelance_projects_user_id_idx\` (\`user_id\`),
+    INDEX \`freelance_projects_status_idx\` (\`status\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`freelance_work_logs\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`freelance_project_id\` VARCHAR(128) NOT NULL,
+    \`description\` TEXT,
+    \`quantity\` DECIMAL(10,2) NOT NULL,
+    \`amount\` DECIMAL(15,2) NOT NULL,
+    \`date\` TIMESTAMP NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`freelance_work_logs_project_id_idx\` (\`freelance_project_id\`),
+    INDEX \`freelance_work_logs_date_idx\` (\`date\`)
+  )`,
 ]
 
 // Columns to add to existing tables: [table, column, definition]
@@ -109,6 +143,14 @@ const ALTER_COLUMNS: [string, string, string][] = [
   ['users', 'company_address',  'TEXT'],
   ['users', 'company_website',  'VARCHAR(500)'],
   ['users', 'company_gstin',    'VARCHAR(20)'],
+  ['payments', 'freelance_project_id', 'VARCHAR(128)'],
+  ['files',    'freelance_project_id', 'VARCHAR(128)'],
+]
+
+// Columns to make nullable if currently NOT NULL: [table, column, varchar-definition]
+const MAKE_NULLABLE: [string, string, string][] = [
+  ['payments', 'client_id', 'VARCHAR(128)'],
+  ['files',    'client_id', 'VARCHAR(128)'],
 ]
 
 export async function runMigrations() {
@@ -129,7 +171,7 @@ export async function runMigrations() {
     await connection.execute(sql)
   }
 
-  // Add new columns only when they don't already exist (compatible with all MySQL versions)
+  // Add new columns only when they don't already exist
   for (const [table, column, definition] of ALTER_COLUMNS) {
     const [rows] = await connection.execute(
       `SELECT COUNT(*) AS cnt FROM information_schema.columns
@@ -139,6 +181,19 @@ export async function runMigrations() {
     if (rows[0].cnt === 0) {
       await connection.execute(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`)
       console.log(`[migrate] Added column ${table}.${column}`)
+    }
+  }
+
+  // Make columns nullable if they are currently NOT NULL
+  for (const [table, column, definition] of MAKE_NULLABLE) {
+    const [rows] = await connection.execute(
+      `SELECT IS_NULLABLE FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+      [table, column]
+    ) as [{ IS_NULLABLE: string }[], unknown]
+    if (rows[0]?.IS_NULLABLE === 'NO') {
+      await connection.execute(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`)
+      console.log(`[migrate] Made ${table}.${column} nullable`)
     }
   }
 

@@ -16,7 +16,8 @@ import type { File as KFile } from '@/types'
 interface FileListProps {
   files: KFile[]
   isLoading: boolean
-  clientId: string
+  clientId?: string
+  freelanceProjectId?: string
 }
 
 function FileIcon({ mimeType }: { mimeType: string }) {
@@ -24,11 +25,11 @@ function FileIcon({ mimeType }: { mimeType: string }) {
   return <FileText className="h-8 w-8 text-red-500" />
 }
 
-export function FileList({ files, isLoading, clientId }: FileListProps) {
+export function FileList({ files, isLoading, clientId, freelanceProjectId }: FileListProps) {
   const [previewFile, setPreviewFile] = useState<KFile | null>(null)
   const [shareFile, setShareFile] = useState<KFile | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const deleteFile = useDeleteFile(clientId)
+  const deleteFile = useDeleteFile({ clientId, freelanceProjectId })
   const { toast } = useToast()
 
   const handleDownload = async (file: KFile) => {

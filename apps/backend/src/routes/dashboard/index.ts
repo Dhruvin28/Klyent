@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
-import { eq, and, gte, inArray, count, sql } from 'drizzle-orm'
-import { db, clients, payments, activityLogs, users } from '../../db'
+import { eq, and, gte, inArray, count, sql, isNotNull } from 'drizzle-orm'
+import { db, clients, payments, activityLogs, users, freelanceProjects, freelanceWorkLogs } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 
 export default async function dashboardRoutes(app: FastifyInstance) {
@@ -21,6 +21,9 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       recentPayments,
       recentClients,
       recentActivity,
+      freelanceBilledRow,
+      freelancePaidRow,
+      freelanceActiveRow,
     ] = await Promise.all([
       // Client counts by status
       db
@@ -73,6 +76,24 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         .innerJoin(users, eq(activityLogs.userId, users.id))
         .orderBy(sql`${activityLogs.createdAt} desc`)
         .limit(10),
+
+      // Freelance: total billed (sum of work log amounts)
+      db
+        .select({ total: sql<string>`COALESCE(SUM(${freelanceWorkLogs.amount}), 0)` })
+        .from(freelanceWorkLogs)
+        .innerJoin(freelanceProjects, and(eq(freelanceWorkLogs.freelanceProjectId, freelanceProjects.id), eq(freelanceProjects.userId, userId))),
+
+      // Freelance: total paid (sum of payments linked to a freelance project)
+      db
+        .select({ total: sql<string>`COALESCE(SUM(${payments.amount}), 0)` })
+        .from(payments)
+        .where(and(eq(payments.userId, userId), isNotNull(payments.freelanceProjectId))),
+
+      // Freelance: active project count
+      db
+        .select({ count: count() })
+        .from(freelanceProjects)
+        .where(and(eq(freelanceProjects.userId, userId), eq(freelanceProjects.status, 'ACTIVE'))),
     ])
 
     // For pending balance, we need the paid amounts for active/on-hold clients
@@ -85,7 +106,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
               paid: sql<string>`sum(${payments.amount})`,
             })
             .from(payments)
-            .where(inArray(payments.clientId, activeClientIds))
+            .where(and(isNotNull(payments.clientId), inArray(payments.clientId, activeClientIds)))
             .groupBy(payments.clientId)
         : []
 
@@ -132,6 +153,11 @@ export default async function dashboardRoutes(app: FastifyInstance) {
 
     const totalRevenue = Number(totalRevenueRow[0]?.total ?? 0)
 
+    const freelanceBilled = Number(freelanceBilledRow[0]?.total ?? 0)
+    const freelancePaid = Number(freelancePaidRow[0]?.total ?? 0)
+    const freelancePending = Math.max(0, freelanceBilled - freelancePaid)
+    const freelanceActiveProjects = Number(freelanceActiveRow[0]?.count ?? 0)
+
     const formattedActivity = recentActivity.map((a) => ({
       id: a.id,
       type: a.type,
@@ -151,6 +177,10 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         completedClients,
         onHoldClients,
         pendingPayments,
+        freelanceBilled,
+        freelancePaid,
+        freelancePending,
+        freelanceActiveProjects,
         monthlyRevenue: Array.from(revenueMap.values()).sort(sortByYearMonth),
         clientGrowth: Array.from(growthMap.values()).sort(sortByYearMonth),
         recentActivity: formattedActivity,

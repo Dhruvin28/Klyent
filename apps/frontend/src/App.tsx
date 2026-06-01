@@ -9,6 +9,8 @@ import { ProfilePage } from '@/pages/ProfilePage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { SharePage } from '@/pages/SharePage'
+import { FreelancePage } from '@/pages/FreelancePage'
+import { FreelanceDetailPage } from '@/pages/FreelanceDetailPage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="/clients/:id" element={<ClientDetailPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/files" element={<FilesPage />} />
+          <Route path="/freelance" element={<FreelancePage />} />
+          <Route path="/freelance/:id" element={<FreelanceDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 

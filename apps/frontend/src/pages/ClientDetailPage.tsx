@@ -44,7 +44,7 @@ export function ClientDetailPage() {
     sort: 'date',
     order: 'desc',
   })
-  const { data: files = [], isLoading: filesLoading } = useFiles(id ?? '')
+  const { data: files = [], isLoading: filesLoading } = useFiles({ clientId: id ?? '' })
 
   const payments = paymentsData?.data ?? []
 

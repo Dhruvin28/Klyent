@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { eq, and, desc, count } from 'drizzle-orm'
-import { db, clients, files, fileVersions, comments, activityLogs, users } from '../../db'
+import { db, clients, files, fileVersions, comments, activityLogs, users, freelanceProjects } from '../../db'
 import { s3Client, deleteS3Object } from '../../lib/s3'
 import { authenticate } from '../../middleware/authenticate'
 import { config } from '../../config'
@@ -12,7 +12,10 @@ const addCommentSchema = z.object({
 })
 
 const listFilesQuerySchema = z.object({
-  clientId: z.string().min(1, 'clientId is required'),
+  clientId: z.string().optional(),
+  freelanceProjectId: z.string().optional(),
+}).refine((d) => d.clientId || d.freelanceProjectId, {
+  message: 'Either clientId or freelanceProjectId is required',
 })
 
 const listCommentsQuerySchema = z.object({
@@ -33,26 +36,25 @@ export default async function fileRoutes(app: FastifyInstance) {
       })
     }
 
-    const { clientId } = queryResult.data
+    const { clientId, freelanceProjectId } = queryResult.data
 
     // Verify ownership
-    const [client] = await db
-      .select({ userId: clients.userId })
-      .from(clients)
-      .where(eq(clients.id, clientId))
-      .limit(1)
-
-    if (!client) {
-      return reply.code(404).send({ error: 'Client not found' })
+    if (clientId) {
+      const [client] = await db.select({ userId: clients.userId }).from(clients).where(eq(clients.id, clientId)).limit(1)
+      if (!client) return reply.code(404).send({ error: 'Client not found' })
+      if (client.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
     }
-    if (client.userId !== userId) {
-      return reply.code(403).send({ error: 'Forbidden' })
+    if (freelanceProjectId) {
+      const [fp] = await db.select({ userId: freelanceProjects.userId }).from(freelanceProjects).where(eq(freelanceProjects.id, freelanceProjectId)).limit(1)
+      if (!fp) return reply.code(404).send({ error: 'Freelance project not found' })
+      if (fp.userId !== userId) return reply.code(403).send({ error: 'Forbidden' })
     }
 
+    const ownerFilter = clientId ? eq(files.clientId, clientId) : eq(files.freelanceProjectId, freelanceProjectId!)
     const fileRows = await db
       .select()
       .from(files)
-      .where(eq(files.clientId, clientId))
+      .where(ownerFilter)
       .orderBy(desc(files.updatedAt))
 
     // For each file, fetch the active version and counts
@@ -142,15 +144,15 @@ export default async function fileRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'No file provided' })
     }
 
-    // Validate clientId from fields
     const clientIdField = data.fields['clientId'] as { value: string } | undefined
-    if (!clientIdField?.value) {
-      // consume remaining stream
-      data.file.resume()
-      return reply.code(400).send({ error: 'clientId is required in form fields' })
-    }
+    const freelanceProjectIdField = data.fields['freelanceProjectId'] as { value: string } | undefined
+    const clientId = clientIdField?.value || undefined
+    const freelanceProjectId = freelanceProjectIdField?.value || undefined
 
-    const clientId = clientIdField.value
+    if (!clientId && !freelanceProjectId) {
+      data.file.resume()
+      return reply.code(400).send({ error: 'Either clientId or freelanceProjectId is required' })
+    }
 
     const customNameField = data.fields['name'] as { value: string } | undefined
     const descriptionField = data.fields['description'] as { value: string } | undefined
@@ -158,19 +160,19 @@ export default async function fileRoutes(app: FastifyInstance) {
     const description = descriptionField?.value?.trim() || undefined
 
     // Verify ownership
-    const [client] = await db
-      .select({ userId: clients.userId, name: clients.name })
-      .from(clients)
-      .where(eq(clients.id, clientId))
-      .limit(1)
-
-    if (!client) {
-      data.file.resume()
-      return reply.code(404).send({ error: 'Client not found' })
+    if (clientId) {
+      const [client] = await db
+        .select({ userId: clients.userId })
+        .from(clients).where(eq(clients.id, clientId)).limit(1)
+      if (!client) { data.file.resume(); return reply.code(404).send({ error: 'Client not found' }) }
+      if (client.userId !== userId) { data.file.resume(); return reply.code(403).send({ error: 'Forbidden' }) }
     }
-    if (client.userId !== userId) {
-      data.file.resume()
-      return reply.code(403).send({ error: 'Forbidden' })
+    if (freelanceProjectId) {
+      const [fp] = await db
+        .select({ userId: freelanceProjects.userId })
+        .from(freelanceProjects).where(eq(freelanceProjects.id, freelanceProjectId)).limit(1)
+      if (!fp) { data.file.resume(); return reply.code(404).send({ error: 'Freelance project not found' }) }
+      if (fp.userId !== userId) { data.file.resume(); return reply.code(403).send({ error: 'Forbidden' }) }
     }
 
     // Validate mime type
@@ -185,11 +187,14 @@ export default async function fileRoutes(app: FastifyInstance) {
 
     const filename = customName || data.filename
 
-    // Check if file with same name exists for this client
+    // Check if file with same name exists for this client/project
+    const ownerCondition = clientId
+      ? eq(files.clientId, clientId)
+      : eq(files.freelanceProjectId, freelanceProjectId!)
     const [existingFile] = await db
       .select()
       .from(files)
-      .where(and(eq(files.clientId, clientId), eq(files.name, filename)))
+      .where(and(ownerCondition, eq(files.name, filename)))
       .limit(1)
 
     let latestVersionNumber = 0
@@ -216,7 +221,8 @@ export default async function fileRoutes(app: FastifyInstance) {
         name: filename,
         description,
         mimeType,
-        clientId,
+        clientId: clientId ?? null,
+        freelanceProjectId: freelanceProjectId ?? null,
         shareToken,
       })
     } else {
@@ -230,7 +236,8 @@ export default async function fileRoutes(app: FastifyInstance) {
     }
 
     // S3 key
-    const s3Key = `users/${userId}/clients/${clientId}/${fileId}/v${nextVersionNumber}/${filename}`
+    const ownerSegment = clientId ? `clients/${clientId}` : `freelance/${freelanceProjectId}`
+    const s3Key = `users/${userId}/${ownerSegment}/${fileId}/v${nextVersionNumber}/${filename}`
 
     // Collect file bytes to determine size (stream to S3)
     const chunks: Buffer[] = []
@@ -259,9 +266,9 @@ export default async function fileRoutes(app: FastifyInstance) {
         ContentLength: fileSize,
         Metadata: {
           userId,
-          clientId,
           fileId,
-          originalName: encodeURIComponent(filename),
+          originalName: encodeURIComponent(filename ?? ''),
+          ...(clientId ? { clientId } : {}),
         },
       })
     )
@@ -286,21 +293,16 @@ export default async function fileRoutes(app: FastifyInstance) {
       description !== undefined ? { description, updatedAt: new Date() } : { updatedAt: new Date() }
     ).where(eq(files.id, fileId))
 
-    // Log activity
-    const logId = crypto.randomUUID()
-    await db.insert(activityLogs).values({
-      id: logId,
-      type: isNewVersion ? 'FILE_VERSION_ADDED' : 'FILE_UPLOADED',
-      metadata: {
-        fileId,
-        fileName: filename,
-        versionNumber: nextVersionNumber,
-        size: fileSize,
-        clientName: client.name,
-      },
-      clientId,
-      userId,
-    })
+    // Log activity only for client files (activity_logs requires clientId NOT NULL)
+    if (clientId) {
+      await db.insert(activityLogs).values({
+        id: crypto.randomUUID(),
+        type: isNewVersion ? 'FILE_VERSION_ADDED' : 'FILE_UPLOADED',
+        metadata: { fileId, fileName: filename, versionNumber: nextVersionNumber, size: fileSize },
+        clientId,
+        userId,
+      })
+    }
 
     // Return the full file with active version
     const [file] = await db.select().from(files).where(eq(files.id, fileId)).limit(1)
@@ -609,18 +611,16 @@ export default async function fileRoutes(app: FastifyInstance) {
       .where(eq(comments.id, commentId))
       .limit(1)
 
-    const logId = crypto.randomUUID()
-    await db.insert(activityLogs).values({
-      id: logId,
-      type: 'COMMENT_ADDED',
-      metadata: {
-        fileId: id,
-        fileName: file.name,
-        commentId,
-      },
-      clientId: file.clientId,
-      userId,
-    })
+    // Log activity only for client files (activityLogs clientId is NOT NULL)
+    if (file.clientId) {
+      await db.insert(activityLogs).values({
+        id: crypto.randomUUID(),
+        type: 'COMMENT_ADDED',
+        metadata: { fileId: id, fileName: file.name, commentId },
+        clientId: file.clientId,
+        userId,
+      })
+    }
 
     return reply.code(201).send({
       data: {

@@ -12,7 +12,7 @@ import { useClients } from '@/hooks/useClients'
 export function FilesPage() {
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const { data: clientsData } = useClients({ limit: 100 })
-  const { data: files = [], isLoading: filesLoading } = useFiles(selectedClientId)
+  const { data: files = [], isLoading: filesLoading } = useFiles({ clientId: selectedClientId || undefined })
 
   const clients = clientsData?.data ?? []
   const selectedClient = clients.find((c) => c.id === selectedClientId)

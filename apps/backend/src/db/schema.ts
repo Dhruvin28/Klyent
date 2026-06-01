@@ -65,11 +65,13 @@ export const payments = mysqlTable(
     notes: text('notes'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
-    clientId: varchar('client_id', { length: 128 }).notNull(),
+    clientId: varchar('client_id', { length: 128 }),           // nullable — null for freelance payments
+    freelanceProjectId: varchar('freelance_project_id', { length: 128 }), // null for client payments
     userId: varchar('user_id', { length: 128 }).notNull(),
   },
   (table) => ({
     clientIdIdx: index('payments_client_id_idx').on(table.clientId),
+    freelanceProjectIdIdx: index('payments_freelance_project_id_idx').on(table.freelanceProjectId),
     userIdIdx: index('payments_user_id_idx').on(table.userId),
     dateIdx: index('payments_date_idx').on(table.date),
   })
@@ -82,13 +84,15 @@ export const files = mysqlTable(
     name: varchar('name', { length: 500 }).notNull(),
     description: text('description'),
     mimeType: varchar('mime_type', { length: 255 }).notNull(),
-    clientId: varchar('client_id', { length: 128 }).notNull(),
+    clientId: varchar('client_id', { length: 128 }),           // nullable — null for freelance files
+    freelanceProjectId: varchar('freelance_project_id', { length: 128 }), // null for client files
     shareToken: varchar('share_token', { length: 128 }).unique(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
   },
   (table) => ({
     clientIdIdx: index('files_client_id_idx').on(table.clientId),
+    freelanceProjectIdIdx: index('files_freelance_project_id_idx').on(table.freelanceProjectId),
     shareTokenIdx: uniqueIndex('files_share_token_idx').on(table.shareToken),
   })
 )
@@ -152,5 +156,43 @@ export const activityLogs = mysqlTable(
     clientIdIdx: index('activity_logs_client_id_idx').on(table.clientId),
     userIdIdx: index('activity_logs_user_id_idx').on(table.userId),
     createdAtIdx: index('activity_logs_created_at_idx').on(table.createdAt),
+  })
+)
+
+export const freelanceProjects = mysqlTable(
+  'freelance_projects',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    clientName: varchar('client_name', { length: 200 }).notNull(),
+    workType: varchar('work_type', { length: 200 }).notNull(),
+    chargeType: varchar('charge_type', { length: 100 }).notNull(), // e.g. "hours", "pages", "sheets"
+    rate: decimal('rate', { precision: 15, scale: 2 }).notNull(),
+    status: mysqlEnum('status', ['ACTIVE', 'COMPLETED']).notNull().default('ACTIVE'),
+    notes: text('notes'),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('freelance_projects_user_id_idx').on(table.userId),
+    statusIdx: index('freelance_projects_status_idx').on(table.status),
+  })
+)
+
+export const freelanceWorkLogs = mysqlTable(
+  'freelance_work_logs',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    freelanceProjectId: varchar('freelance_project_id', { length: 128 }).notNull(),
+    description: text('description'),
+    quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
+    amount: decimal('amount', { precision: 15, scale: 2 }).notNull(), // quantity * rate
+    date: timestamp('date').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    projectIdIdx: index('freelance_work_logs_project_id_idx').on(table.freelanceProjectId),
+    dateIdx: index('freelance_work_logs_date_idx').on(table.date),
   })
 )

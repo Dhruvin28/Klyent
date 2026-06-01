@@ -1,6 +1,7 @@
 export type Role = 'ADMIN' | 'MEMBER'
 export type ClientStatus = 'ACTIVE' | 'COMPLETED' | 'ON_HOLD'
 export type PaymentMethod = 'CASH' | 'ONLINE' | 'CHEQUE'
+export type FreelanceStatus = 'ACTIVE' | 'COMPLETED'
 export type ActivityType =
   | 'PAYMENT_ADDED'
   | 'PAYMENT_UPDATED'
@@ -49,8 +50,10 @@ export interface Payment {
   date: string
   notes?: string
   createdAt: string
-  clientId: string
-  client?: Pick<Client, 'id' | 'name'>
+  clientId?: string | null
+  freelanceProjectId?: string | null
+  client?: Pick<Client, 'id' | 'name'> | null
+  freelanceProject?: { id: string; clientName: string; workType: string } | null
   user?: Pick<User, 'id' | 'name'>
 }
 
@@ -59,10 +62,12 @@ export interface File {
   name: string
   description?: string | null
   mimeType: string
-  clientId: string
+  clientId?: string | null
+  freelanceProjectId?: string | null
   shareToken?: string
   createdAt: string
   latestVersion?: FileVersion
+  versions?: (FileVersion & { uploadedBy?: Pick<User, 'id' | 'name'> })[]
   _count?: { versions: number; comments: number }
 }
 
@@ -98,6 +103,10 @@ export interface DashboardStats {
   completedClients: number
   onHoldClients: number
   pendingPayments: number
+  freelanceBilled: number
+  freelancePaid: number
+  freelancePending: number
+  freelanceActiveProjects: number
   monthlyRevenue: { month: number; year: number; total: number }[]
   clientGrowth: { month: number; year: number; count: number }[]
   recentActivity: ActivityLog[]
@@ -114,4 +123,33 @@ export interface PaginatedResponse<T> {
 export interface AuthResponse {
   token: string
   user: User
+}
+
+export interface FreelanceProject {
+  id: string
+  clientName: string
+  workType: string
+  chargeType: string
+  rate: number
+  status: FreelanceStatus
+  notes?: string | null
+  userId: string
+  createdAt: string
+  updatedAt: string
+  // computed stats
+  totalBilled: number
+  totalPaid: number
+  remainingBalance: number
+  workLogs?: FreelanceWorkLog[]
+}
+
+export interface FreelanceWorkLog {
+  id: string
+  freelanceProjectId: string
+  description?: string | null
+  quantity: number
+  amount: number
+  date: string
+  createdAt: string
+  updatedAt: string
 }

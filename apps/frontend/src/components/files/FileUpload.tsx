@@ -9,10 +9,13 @@ import { useUploadFile } from '@/hooks/useFiles'
 import { useToast } from '@/components/ui/toast'
 
 interface FileUploadProps {
-  clientId: string
+  clientId?: string
+  freelanceProjectId?: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function FileUpload({ clientId }: FileUploadProps) {
+export function FileUpload({ clientId, freelanceProjectId, open, onOpenChange }: FileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [customName, setCustomName] = useState('')
@@ -20,7 +23,7 @@ export function FileUpload({ clientId }: FileUploadProps) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const uploadFile = useUploadFile(clientId)
+  const uploadFile = useUploadFile({ clientId, freelanceProjectId })
   const { toast } = useToast()
 
   const VALID_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/webp']

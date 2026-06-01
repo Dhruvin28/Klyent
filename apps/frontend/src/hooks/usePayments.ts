@@ -14,8 +14,8 @@ export function useCreatePayment() {
     mutationFn: (data: CreatePaymentData) => paymentsApi.createPayment(data),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['payments'] })
-      qc.invalidateQueries({ queryKey: ['clients', data.clientId] })
       qc.invalidateQueries({ queryKey: ['clients'] })
+      qc.invalidateQueries({ queryKey: ['freelance'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })

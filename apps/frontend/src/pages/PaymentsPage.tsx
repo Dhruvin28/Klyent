@@ -200,7 +200,10 @@ export function PaymentsPage() {
               {payments.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell className="font-medium">
-                    {payment.client?.name ?? '—'}
+                    {payment.client?.name ?? payment.freelanceProject?.clientName ?? '—'}
+                    {payment.freelanceProject && (
+                      <span className="block text-xs text-muted-foreground">{payment.freelanceProject.workType}</span>
+                    )}
                   </TableCell>
                   <TableCell className="font-semibold">
                     {formatCurrency(payment.amount)}

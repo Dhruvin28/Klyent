@@ -1,22 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { filesApi } from '@/api/files'
 
-export function useFiles(clientId: string) {
+type FileOwner = { clientId?: string; freelanceProjectId?: string }
+
+export function useFiles(owner: FileOwner) {
+  const key = owner.clientId ?? owner.freelanceProjectId ?? ''
   return useQuery({
-    queryKey: ['files', clientId],
-    queryFn: () => filesApi.getFiles(clientId),
-    enabled: !!clientId,
+    queryKey: ['files', key],
+    queryFn: () => filesApi.getFiles(owner),
+    enabled: !!(owner.clientId || owner.freelanceProjectId),
   })
 }
 
-export function useUploadFile(clientId: string) {
+export function useUploadFile(owner: FileOwner) {
   const qc = useQueryClient()
+  const key = owner.clientId ?? owner.freelanceProjectId ?? ''
   return useMutation({
     mutationFn: ({ file, name, description, onProgress }: { file: globalThis.File; name?: string; description?: string; onProgress?: (p: number) => void }) =>
-      filesApi.uploadFile(clientId, file, { name, description, onProgress }),
+      filesApi.uploadFile(owner, file, { name, description, onProgress }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['files', clientId] })
-      qc.invalidateQueries({ queryKey: ['clients', clientId] })
+      qc.invalidateQueries({ queryKey: ['files', key] })
+      if (owner.clientId) qc.invalidateQueries({ queryKey: ['clients', owner.clientId] })
+      if (owner.freelanceProjectId) qc.invalidateQueries({ queryKey: ['freelance', owner.freelanceProjectId] })
     },
   })
 }
@@ -29,13 +34,15 @@ export function useFileVersions(id: string) {
   })
 }
 
-export function useDeleteFile(clientId: string) {
+export function useDeleteFile(owner: FileOwner) {
   const qc = useQueryClient()
+  const key = owner.clientId ?? owner.freelanceProjectId ?? ''
   return useMutation({
     mutationFn: (id: string) => filesApi.deleteFile(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['files', clientId] })
-      qc.invalidateQueries({ queryKey: ['clients', clientId] })
+      qc.invalidateQueries({ queryKey: ['files', key] })
+      if (owner.clientId) qc.invalidateQueries({ queryKey: ['clients', owner.clientId] })
+      if (owner.freelanceProjectId) qc.invalidateQueries({ queryKey: ['freelance', owner.freelanceProjectId] })
     },
   })
 }

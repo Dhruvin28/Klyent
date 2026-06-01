@@ -3,6 +3,7 @@ import type { Payment, PaginatedResponse } from '@/types'
 
 export interface PaymentParams {
   clientId?: string
+  freelanceProjectId?: string
   method?: string
   startDate?: string
   endDate?: string
@@ -13,7 +14,8 @@ export interface PaymentParams {
 }
 
 export interface CreatePaymentData {
-  clientId: string
+  clientId?: string
+  freelanceProjectId?: string
   amount: number
   method: 'CASH' | 'ONLINE' | 'CHEQUE'
   date: string

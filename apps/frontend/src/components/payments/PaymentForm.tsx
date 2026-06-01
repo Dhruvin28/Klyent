@@ -16,38 +16,38 @@ import { useToast } from '@/components/ui/toast'
 import type { Client, Payment } from '@/types'
 
 const schema = z.object({
-  clientId: z.string().min(1, 'Client is required'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0'),
   method: z.enum(['CASH', 'ONLINE', 'CHEQUE']),
   date: z.string().min(1, 'Date is required'),
   notes: z.string().optional(),
+  // one of these will be set externally; selector only shown when neither is pre-set
+  clientId: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
 
 interface PaymentFormProps {
+  // Client mode
   clientId?: string
   clients?: Client[]
+  // Freelance mode
+  freelanceProjectId?: string
+  freelanceProjectName?: string
+  // Edit mode
   payment?: Payment
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function PaymentForm({ clientId, clients, payment, open, onOpenChange }: PaymentFormProps) {
+export function PaymentForm({ clientId, clients, freelanceProjectId, freelanceProjectName, payment, open, onOpenChange }: PaymentFormProps) {
   const isEdit = !!payment
-  const showClientSelector = !clientId
+  const isFreelanceMode = !!freelanceProjectId
+  const showClientSelector = !clientId && !isFreelanceMode && !isEdit
   const createPayment = useCreatePayment()
   const updatePayment = useUpdatePayment()
   const { toast } = useToast()
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       clientId: clientId ?? '',
@@ -61,7 +61,7 @@ export function PaymentForm({ clientId, clients, payment, open, onOpenChange }: 
   useEffect(() => {
     if (payment) {
       reset({
-        clientId: payment.clientId,
+        clientId: payment.clientId ?? '',
         amount: payment.amount,
         method: payment.method,
         date: format(new Date(payment.date), 'yyyy-MM-dd'),
@@ -83,17 +83,20 @@ export function PaymentForm({ clientId, clients, payment, open, onOpenChange }: 
 
   const onSubmit = async (data: FormData) => {
     try {
-      const payload = {
-        ...data,
-        date: new Date(data.date).toISOString(),
-        notes: data.notes || undefined,
-      }
+      const isoDate = new Date(data.date).toISOString()
       if (isEdit && payment) {
-        await updatePayment.mutateAsync({ id: payment.id, data: payload })
-        toast({ title: 'Payment updated', description: 'Changes saved successfully.' })
+        await updatePayment.mutateAsync({ id: payment.id, data: { amount: data.amount, method: data.method, date: isoDate, notes: data.notes || undefined } })
+        toast({ title: 'Payment updated' })
       } else {
-        await createPayment.mutateAsync(payload)
-        toast({ title: 'Payment recorded', description: 'New payment has been added.' })
+        await createPayment.mutateAsync({
+          clientId: isFreelanceMode ? undefined : (data.clientId || clientId),
+          freelanceProjectId: isFreelanceMode ? freelanceProjectId : undefined,
+          amount: data.amount,
+          method: data.method,
+          date: isoDate,
+          notes: data.notes || undefined,
+        })
+        toast({ title: 'Payment recorded' })
       }
       onOpenChange(false)
     } catch {
@@ -108,13 +111,17 @@ export function PaymentForm({ clientId, clients, payment, open, onOpenChange }: 
           <DialogTitle>{isEdit ? 'Edit Payment' : 'Record Payment'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
+          {isFreelanceMode && (
+            <div className="rounded-lg bg-muted px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Project: </span>
+              <span className="font-medium">{freelanceProjectName}</span>
+            </div>
+          )}
+
           {showClientSelector && (
             <div className="space-y-1.5">
               <Label>Client *</Label>
-              <Select
-                value={clientIdValue}
-                onValueChange={(v) => setValue('clientId', v, { shouldValidate: true })}
-              >
+              <Select value={clientIdValue} onValueChange={(v) => setValue('clientId', v, { shouldValidate: true })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a client" />
                 </SelectTrigger>
@@ -124,33 +131,20 @@ export function PaymentForm({ clientId, clients, payment, open, onOpenChange }: 
                   ))}
                 </SelectContent>
               </Select>
-              {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
             </div>
           )}
 
           <div className="space-y-1.5">
             <Label htmlFor="amount">Amount (₹) *</Label>
-            <Input
-              id="amount"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              {...register('amount')}
-            />
+            <Input id="amount" type="number" min="0" step="0.01" placeholder="0.00" {...register('amount')} />
             {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Payment Method *</Label>
-              <Select
-                value={methodValue}
-                onValueChange={(v) => setValue('method', v as FormData['method'])}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={methodValue} onValueChange={(v) => setValue('method', v as FormData['method'])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CASH">Cash</SelectItem>
                   <SelectItem value="ONLINE">Online</SelectItem>
@@ -158,7 +152,6 @@ export function PaymentForm({ clientId, clients, payment, open, onOpenChange }: 
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="date">Date *</Label>
               <Input id="date" type="date" {...register('date')} />
@@ -172,9 +165,7 @@ export function PaymentForm({ clientId, clients, payment, open, onOpenChange }: 
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Record Payment'}
             </Button>
