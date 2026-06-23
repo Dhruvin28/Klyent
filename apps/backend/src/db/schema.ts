@@ -179,6 +179,43 @@ export const freelanceProjects = mysqlTable(
   })
 )
 
+export const proposals = mysqlTable(
+  'proposals',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    proposalNumber: varchar('proposal_number', { length: 100 }).notNull(),
+    serviceType: varchar('service_type', { length: 200 }).notNull(),
+    date: varchar('date', { length: 10 }).notNull(),
+    validTill: varchar('valid_till', { length: 10 }).notNull(),
+    clientName: varchar('client_name', { length: 200 }).notNull(),
+    clientPhone: varchar('client_phone', { length: 50 }),
+    clientEmail: varchar('client_email', { length: 255 }),
+    clientAddress: text('client_address'),
+    siteName: varchar('site_name', { length: 200 }),
+    projectLocation: varchar('project_location', { length: 200 }),
+    projectType: varchar('project_type', { length: 100 }),
+    projectScope: varchar('project_scope', { length: 500 }),
+    aboutCompany: text('about_company'),
+    scopeOfWork: json('scope_of_work').$type<string[]>(),
+    feesDescription: varchar('fees_description', { length: 500 }).notNull(),
+    feesAmount: decimal('fees_amount', { precision: 15, scale: 2 }).notNull(),
+    feesAmountInWords: varchar('fees_amount_in_words', { length: 500 }),
+    feesNote: text('fees_note'),
+    paymentMilestones: json('payment_milestones').$type<{ milestone: number; description: string; percentage: number; amount: number }[]>(),
+    termsAndConditions: json('terms_and_conditions').$type<string[]>(),
+    status: mysqlEnum('status', ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED']).notNull().default('DRAFT'),
+    shareToken: varchar('share_token', { length: 128 }).unique(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('proposals_user_id_idx').on(table.userId),
+    statusIdx: index('proposals_status_idx').on(table.status),
+    shareTokenIdx: uniqueIndex('proposals_share_token_idx').on(table.shareToken),
+  })
+)
+
 export const freelanceWorkLogs = mysqlTable(
   'freelance_work_logs',
   {

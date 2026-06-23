@@ -143,6 +143,50 @@ export interface FreelanceProject {
   workLogs?: FreelanceWorkLog[]
 }
 
+export type ProposalStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED'
+
+export interface PaymentMilestone {
+  milestone: number
+  description: string
+  percentage: number
+  amount: number
+}
+
+export interface Proposal {
+  id: string
+  proposalNumber: string
+  serviceType: string
+  date: string
+  validTill: string
+  clientName: string
+  clientPhone?: string | null
+  clientEmail?: string | null
+  clientAddress?: string | null
+  siteName?: string | null
+  projectLocation?: string | null
+  projectType?: string | null
+  projectScope?: string | null
+  aboutCompany?: string | null
+  scopeOfWork?: string[] | null
+  feesDescription: string
+  feesAmount: number
+  feesAmountInWords?: string | null
+  feesNote?: string | null
+  paymentMilestones?: PaymentMilestone[] | null
+  termsAndConditions?: string[] | null
+  status: ProposalStatus
+  shareToken?: string | null
+  userId: string
+  createdAt: string
+  updatedAt: string
+  // joined from user
+  companyName?: string | null
+  companyLogoUrl?: string | null
+  companyPhone?: string | null
+  companyAddress?: string | null
+  companyWebsite?: string | null
+}
+
 export interface FreelanceWorkLog {
   id: string
   freelanceProjectId: string

@@ -11,6 +11,10 @@ import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { SharePage } from '@/pages/SharePage'
 import { FreelancePage } from '@/pages/FreelancePage'
 import { FreelanceDetailPage } from '@/pages/FreelanceDetailPage'
+import { ProposalsPage } from '@/pages/ProposalsPage'
+import { CreateProposalPage } from '@/pages/CreateProposalPage'
+import { ProposalDetailPage } from '@/pages/ProposalDetailPage'
+import { ProposalSharePage } from '@/pages/ProposalSharePage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -21,8 +25,9 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Public share route */}
+        {/* Public share routes */}
         <Route path="/share/:token" element={<SharePage />} />
+        <Route path="/proposals/share/:token" element={<ProposalSharePage />} />
 
         {/* Protected app routes */}
         <Route element={<AppLayout />}>
@@ -33,6 +38,9 @@ export default function App() {
           <Route path="/files" element={<FilesPage />} />
           <Route path="/freelance" element={<FreelancePage />} />
           <Route path="/freelance/:id" element={<FreelanceDetailPage />} />
+          <Route path="/proposals" element={<ProposalsPage />} />
+          <Route path="/proposals/new" element={<CreateProposalPage />} />
+          <Route path="/proposals/:id" element={<ProposalDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
