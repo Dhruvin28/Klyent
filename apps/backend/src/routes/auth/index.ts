@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { eq, and, ne } from 'drizzle-orm'
 import { db, users } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
-import { uploadToS3, deleteS3Object } from '../../lib/s3'
+import { uploadToS3, deleteS3Object, s3Client } from '../../lib/s3'
+import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { config } from '../../config'
 
 const USER_SELECT = {
@@ -187,23 +188,26 @@ export default async function authRoutes(app: FastifyInstance) {
   })
 
   // GET /api/auth/logo-proxy?key=logos/... — public, no auth
-  // Proxies R2 logo images to avoid CORS issues in @react-pdf/renderer
+  // Fetches logo directly from R2 via S3 SDK (bypasses CORS) for @react-pdf/renderer
   app.get('/logo-proxy', async (request, reply) => {
     const { key } = request.query as { key?: string }
     if (!key || !/^logos\/[^/]+\.(jpg|jpeg|png|webp|svg)$/i.test(key)) {
       return reply.code(400).send({ error: 'Invalid key' })
     }
-    const url = `${config.r2.publicUrl}/${key}`
     try {
-      const response = await fetch(url)
-      if (!response.ok) return reply.code(404).send({ error: 'Logo not found' })
-      const contentType = response.headers.get('content-type') ?? 'image/png'
-      const buffer = Buffer.from(await response.arrayBuffer())
-      reply.header('Content-Type', contentType)
+      const result = await s3Client.send(new GetObjectCommand({
+        Bucket: config.r2.bucket,
+        Key: key,
+      }))
+      const chunks: Buffer[] = []
+      for await (const chunk of result.Body as AsyncIterable<Uint8Array>) {
+        chunks.push(Buffer.from(chunk))
+      }
+      reply.header('Content-Type', result.ContentType ?? 'image/png')
       reply.header('Cache-Control', 'public, max-age=86400')
-      return reply.send(buffer)
+      return reply.send(Buffer.concat(chunks))
     } catch {
-      return reply.code(502).send({ error: 'Failed to fetch logo' })
+      return reply.code(404).send({ error: 'Logo not found' })
     }
   })
 }
