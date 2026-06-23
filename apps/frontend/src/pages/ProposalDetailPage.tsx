@@ -4,6 +4,7 @@ import { ChevronLeft, Download, Share2, Check, Trash2, FileText } from 'lucide-r
 import { useState } from 'react'
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer'
 import { ProposalPDF } from '@/components/proposals/ProposalPDF'
+import { useLogoDataUrl } from '@/hooks/useLogoDataUrl'
 import { proposalsApi } from '@/api/proposals'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +26,7 @@ export function ProposalDetailPage() {
   const qc = useQueryClient()
   const [copied, setCopied] = useState(false)
   const [deletingOpen, setDeletingOpen] = useState(false)
+  const logoDataUrl = useLogoDataUrl()
 
   const { data: proposal, isLoading } = useQuery({
     queryKey: ['proposal', id],
@@ -97,7 +99,7 @@ export function ProposalDetailPage() {
           </Button>
 
           <PDFDownloadLink
-            document={<ProposalPDF proposal={proposal} />}
+            document={<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />}
             fileName={`Proposal-${proposal.proposalNumber}.pdf`}
           >
             {({ loading }) => (
@@ -121,7 +123,7 @@ export function ProposalDetailPage() {
       {/* PDF Viewer */}
       <div className="rounded-lg overflow-hidden shadow border border-border" style={{ height: '80vh' }}>
         <PDFViewer width="100%" height="100%" showToolbar={false}>
-          <ProposalPDF proposal={proposal} />
+          <ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />
         </PDFViewer>
       </div>
 

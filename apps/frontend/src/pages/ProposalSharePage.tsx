@@ -4,6 +4,7 @@ import { Download, AlertCircle, Layers } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import { ProposalPDF } from '@/components/proposals/ProposalPDF'
+import { fetchLogoAsDataUrl } from '@/lib/logoProxy'
 import { proposalsApi } from '@/api/proposals'
 import { Button } from '@/components/ui/button'
 
@@ -22,17 +23,21 @@ function PdfFrame({ token }: { token: string }) {
 
   useEffect(() => {
     if (!proposal) return
+    let cancelled = false
     let objectUrl: string
 
-    pdf(<ProposalPDF proposal={proposal} />)
-      .toBlob()
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob)
-        setSrc(objectUrl)
-        setGenerating(false)
-      })
+    ;(async () => {
+      const logoDataUrl = await fetchLogoAsDataUrl(proposal.companyLogoUrl)
+      if (cancelled) return
+      const blob = await pdf(<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />).toBlob()
+      if (cancelled) return
+      objectUrl = URL.createObjectURL(blob)
+      setSrc(objectUrl)
+      setGenerating(false)
+    })()
 
     return () => {
+      cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [proposal])
@@ -68,7 +73,8 @@ export function ProposalSharePage() {
 
   const handleDownload = async () => {
     if (!proposal) return
-    const blob = await pdf(<ProposalPDF proposal={proposal} />).toBlob()
+    const logoDataUrl = await fetchLogoAsDataUrl(proposal.companyLogoUrl)
+    const blob = await pdf(<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />).toBlob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

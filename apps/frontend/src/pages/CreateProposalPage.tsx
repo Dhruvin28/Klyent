@@ -13,6 +13,7 @@ import { proposalsApi } from '@/api/proposals'
 import { useAuthStore } from '@/store/auth.store'
 import { useToast } from '@/components/ui/toast'
 import { numberToWords } from '@/lib/numberToWords'
+import { useLogoDataUrl } from '@/hooks/useLogoDataUrl'
 import { cn } from '@/lib/utils'
 import type { Proposal } from '@/types'
 
@@ -291,6 +292,7 @@ export function CreateProposalPage() {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [savedProposal, setSavedProposal] = useState<Proposal | null>(null)
+  const logoDataUrl = useLogoDataUrl()
 
   const [form, setForm] = useState<FormData>(() => {
     const d = today()
@@ -402,7 +404,7 @@ export function CreateProposalPage() {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     companyName: user?.companyName ?? '',
-    companyLogoUrl: user?.companyLogoUrl ?? null,
+    companyLogoUrl: logoDataUrl,
     companyPhone: user?.companyPhone ?? null,
     companyAddress: user?.companyAddress ?? null,
     companyWebsite: user?.companyWebsite ?? null,

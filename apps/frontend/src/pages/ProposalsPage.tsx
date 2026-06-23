@@ -13,6 +13,7 @@ import { PDFDownloadLink } from '@react-pdf/renderer'
 import { ProposalPDF } from '@/components/proposals/ProposalPDF'
 import { proposalsApi } from '@/api/proposals'
 import { useToast } from '@/components/ui/toast'
+import { useLogoDataUrl } from '@/hooks/useLogoDataUrl'
 import { formatDate } from '@/lib/utils'
 import type { Proposal } from '@/types'
 
@@ -53,7 +54,7 @@ function CopyShareButton({ proposalId }: { proposalId: string }) {
   )
 }
 
-function ProposalCard({ proposal, onDelete }: { proposal: Proposal; onDelete: (id: string) => void }) {
+function ProposalCard({ proposal, onDelete, logoDataUrl }: { proposal: Proposal; onDelete: (id: string) => void; logoDataUrl: string | null }) {
   const navigate = useNavigate()
   const milestones = proposal.paymentMilestones ?? []
 
@@ -94,7 +95,7 @@ function ProposalCard({ proposal, onDelete }: { proposal: Proposal; onDelete: (i
           </Button>
 
           <PDFDownloadLink
-            document={<ProposalPDF proposal={proposal} />}
+            document={<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />}
             fileName={`Proposal-${proposal.proposalNumber}.pdf`}
           >
             {({ loading }) => (
@@ -128,6 +129,7 @@ export function ProposalsPage() {
   const qc = useQueryClient()
   const [status, setStatus] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const logoDataUrl = useLogoDataUrl()
 
   const { data, isLoading } = useQuery({
     queryKey: ['proposals', { status }],
@@ -201,7 +203,7 @@ export function ProposalsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {proposals.map((p) => (
-            <ProposalCard key={p.id} proposal={p} onDelete={setDeletingId} />
+            <ProposalCard key={p.id} proposal={p} onDelete={setDeletingId} logoDataUrl={logoDataUrl} />
           ))}
         </div>
       )}
