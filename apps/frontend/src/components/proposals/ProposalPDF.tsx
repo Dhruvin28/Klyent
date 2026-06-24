@@ -430,16 +430,23 @@ const styles = StyleSheet.create({
   },
   thankYouBar: {
     backgroundColor: C.darkGreen,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 2,
     alignItems: 'center',
   },
   thankYouText: {
     color: C.white,
-    fontSize: 8,
-    letterSpacing: 5,
+    fontSize: 9,
+    letterSpacing: 1,
     fontFamily: 'Helvetica-Bold',
+  },
+  thankYouSubText: {
+    color: C.white,
+    fontSize: 7,
+    letterSpacing: 0.5,
+    marginTop: 3,
+    opacity: 0.8,
   },
 })
 
@@ -755,9 +762,8 @@ export function ProposalPDF({ proposal: p }: Props) {
           </View>
 
           <View style={styles.thankYouBar}>
-            <Text style={styles.thankYouText}>
-              T H A N K  Y O U  F O R  Y O U R  T R U S T  I N  U S .
-            </Text>
+            <Text style={styles.thankYouText}>Thank You for Choosing Us</Text>
+            <Text style={styles.thankYouSubText}>We look forward to delivering great results together.</Text>
           </View>
         </View>
 
