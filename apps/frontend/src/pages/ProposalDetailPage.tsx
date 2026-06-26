@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, Download, Share2, Check, Trash2, FileText } from 'lucide-react'
+import { ChevronLeft, Download, Share2, Check, Trash2, FileText, Copy, GitBranch } from 'lucide-react'
 import { useState } from 'react'
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer'
 import { ProposalPDF } from '@/components/proposals/ProposalPDF'
@@ -89,10 +89,21 @@ export function ProposalDetailPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-semibold">{proposal.clientName}</h2>
             <Badge className={STATUS_COLORS[proposal.status]}>{proposal.status}</Badge>
+            {proposal.version > 1 && (
+              <Badge className="border-transparent bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400">v{proposal.version}</Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">{proposal.proposalNumber} · {proposal.serviceType}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => navigate(`/proposals/new?copyFrom=${proposal.id}`)}>
+            <Copy className="h-4 w-4 mr-1" /> Copy
+          </Button>
+
+          <Button variant="outline" size="sm" onClick={() => navigate(`/proposals/new?versionOf=${proposal.id}`)}>
+            <GitBranch className="h-4 w-4 mr-1" /> New Version
+          </Button>
+
           <Button variant="outline" size="sm" onClick={handleShare}>
             {copied ? <Check className="h-4 w-4 mr-1 text-green-600" /> : <Share2 className="h-4 w-4 mr-1" />}
             {copied ? 'Copied!' : 'Share Link'}

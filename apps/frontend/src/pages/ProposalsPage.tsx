@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FileText, Download, Share2, Trash2, Eye, Copy, Check } from 'lucide-react'
+import { Plus, FileText, Download, Share2, Trash2, Eye, Copy, Check, GitBranch } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -70,6 +70,9 @@ function ProposalCard({ proposal, onDelete, logoDataUrl }: { proposal: Proposal;
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-sm truncate">{proposal.clientName}</span>
                 <Badge className={STATUS_COLORS[proposal.status]}>{proposal.status}</Badge>
+                {proposal.version > 1 && (
+                  <Badge className="border-transparent bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400">v{proposal.version}</Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{proposal.proposalNumber} · {proposal.serviceType}</p>
               <p className="text-xs text-muted-foreground">
@@ -106,6 +109,22 @@ function ProposalCard({ proposal, onDelete, logoDataUrl }: { proposal: Proposal;
           </PDFDownloadLink>
 
           <CopyShareButton proposalId={proposal.id} />
+
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => navigate(`/proposals/new?copyFrom=${proposal.id}`)}
+            title="Duplicate as a new proposal"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => navigate(`/proposals/new?versionOf=${proposal.id}`)}
+            title="Create a new version"
+          >
+            <GitBranch className="h-4 w-4" />
+          </Button>
 
           <div className="flex-1" />
 

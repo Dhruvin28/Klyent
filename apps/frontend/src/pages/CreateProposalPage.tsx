@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, ChevronLeft, ChevronRight, Check, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -78,6 +79,36 @@ function generateProposalNumber(companyName: string | null | undefined): string 
   const ym = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, '0')}`
   const seq = String(Math.floor(Math.random() * 90) + 10)
   return `${prefix}/${ym}/${seq}`
+}
+
+// Map a saved proposal into the editable form shape (adds local ids to lists).
+function proposalToForm(p: Proposal): FormData {
+  return {
+    clientName: p.clientName ?? '',
+    clientPhone: p.clientPhone ?? '',
+    clientEmail: p.clientEmail ?? '',
+    clientAddress: p.clientAddress ?? '',
+    siteName: p.siteName ?? '',
+    projectLocation: p.projectLocation ?? '',
+    projectType: p.projectType ?? '',
+    projectScope: p.projectScope ?? '',
+    serviceType: p.serviceType ?? '',
+    proposalNumber: p.proposalNumber ?? '',
+    date: p.date ?? today(),
+    validTill: p.validTill ?? addDays(today(), 7),
+    aboutCompany: p.aboutCompany ?? '',
+    scopeOfWork: (p.scopeOfWork && p.scopeOfWork.length > 0)
+      ? p.scopeOfWork.map((text) => ({ id: uid(), text }))
+      : [{ id: uid(), text: '' }],
+    feesDescription: p.feesDescription ?? '',
+    feesAmount: p.feesAmount != null ? String(p.feesAmount) : '',
+    feesAmountInWords: p.feesAmountInWords ?? '',
+    feesNote: p.feesNote ?? '',
+    paymentMilestones: (p.paymentMilestones ?? []).map((m) => ({ id: uid(), ...m })),
+    termsAndConditions: (p.termsAndConditions && p.termsAndConditions.length > 0)
+      ? p.termsAndConditions.map((text) => ({ id: uid(), text }))
+      : DEFAULT_TERMS.map((t) => ({ id: uid(), text: t })),
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -289,10 +320,23 @@ export function CreateProposalPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const { toast } = useToast()
+  const [searchParams] = useSearchParams()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [savedProposal, setSavedProposal] = useState<Proposal | null>(null)
   const logoDataUrl = useLogoDataUrl()
+
+  // ── Copy / New-version modes ──────────────────────────────────
+  const copyFrom = searchParams.get('copyFrom')
+  const versionOf = searchParams.get('versionOf')
+  const sourceId = versionOf ?? copyFrom
+  const mode: 'create' | 'copy' | 'version' = versionOf ? 'version' : copyFrom ? 'copy' : 'create'
+
+  const { data: sourceProposal, isLoading: loadingSource } = useQuery({
+    queryKey: ['proposal', sourceId],
+    queryFn: () => proposalsApi.getProposal(sourceId!),
+    enabled: !!sourceId,
+  })
 
   const [form, setForm] = useState<FormData>(() => {
     const d = today()
@@ -323,6 +367,27 @@ export function CreateProposalPage() {
   const set = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }, [])
+
+  // Pre-fill the form once the source proposal loads (copy / new-version flows).
+  const prefilledRef = useRef(false)
+  useEffect(() => {
+    if (!sourceProposal || prefilledRef.current) return
+    prefilledRef.current = true
+    const base = proposalToForm(sourceProposal)
+    if (mode === 'copy') {
+      // A copy is a brand new proposal: fresh number and dates, same content.
+      const d = today()
+      setForm({
+        ...base,
+        proposalNumber: generateProposalNumber(user?.companyName),
+        date: d,
+        validTill: addDays(d, 7),
+      })
+    } else {
+      // New version keeps the same proposal number / client; user edits the rest.
+      setForm(base)
+    }
+  }, [sourceProposal, mode, user?.companyName])
 
   // Auto-calculate amount in words
   const handleFeesAmountChange = (val: string) => {
@@ -385,9 +450,16 @@ export function CreateProposalPage() {
     setSaving(true)
     try {
       const payload = { ...buildPayload(), status: asDraft ? 'DRAFT' as const : 'SENT' as const }
-      const created = await proposalsApi.createProposal(payload)
+      const created = mode === 'version'
+        ? await proposalsApi.createVersion(versionOf!, payload)
+        : await proposalsApi.createProposal(payload)
       setSavedProposal(created)
-      toast({ title: 'Proposal saved!', description: `Proposal ${created.proposalNumber} created.` })
+      toast({
+        title: mode === 'version' ? 'New version saved!' : 'Proposal saved!',
+        description: mode === 'version'
+          ? `Version ${created.version} of ${created.proposalNumber} created.`
+          : `Proposal ${created.proposalNumber} created.`,
+      })
     } catch {
       toast({ title: 'Error', description: 'Failed to save proposal.', variant: 'destructive' })
     } finally {
@@ -400,6 +472,7 @@ export function CreateProposalPage() {
     id: savedProposal?.id ?? 'preview',
     ...buildPayload(),
     status: 'DRAFT',
+    version: savedProposal?.version ?? (mode === 'version' && sourceProposal ? sourceProposal.version + 1 : 1),
     userId: user?.id ?? '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -410,6 +483,22 @@ export function CreateProposalPage() {
     companyWebsite: user?.companyWebsite ?? null,
   }
 
+  const pageTitle = mode === 'copy' ? 'Copy Proposal' : mode === 'version' ? 'New Proposal Version' : 'Create Proposal'
+  const pageSubtitle = mode === 'copy'
+    ? 'Pre-filled from an existing proposal. Change anything you like, then generate a new proposal.'
+    : mode === 'version'
+      ? `Editing creates a new version for the same client${sourceProposal ? ` (current v${sourceProposal.version})` : ''}. The original is kept.`
+      : 'Fill in the details below to generate a professional proposal PDF.'
+
+  // While loading the source proposal for copy / version, show a light placeholder.
+  if (sourceId && loadingSource) {
+    return (
+      <div className="max-w-3xl mx-auto py-20 text-center text-sm text-muted-foreground">
+        Loading proposal…
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Page header */}
@@ -417,8 +506,8 @@ export function CreateProposalPage() {
         <button onClick={() => navigate('/proposals')} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2">
           <ChevronLeft className="h-4 w-4" /> Back to Proposals
         </button>
-        <h2 className="text-xl font-semibold">Create Proposal</h2>
-        <p className="text-sm text-muted-foreground">Fill in the details below to generate a professional proposal PDF.</p>
+        <h2 className="text-xl font-semibold">{pageTitle}</h2>
+        <p className="text-sm text-muted-foreground">{pageSubtitle}</p>
       </div>
 
       <StepIndicator current={step} />
@@ -641,7 +730,7 @@ export function CreateProposalPage() {
                   </>
                 ) : (
                   <Button onClick={() => handleSave(false)} disabled={saving} className="flex-1">
-                    {saving ? 'Saving…' : 'Save & Download Proposal'}
+                    {saving ? 'Saving…' : mode === 'version' ? 'Save New Version & Download' : 'Save & Download Proposal'}
                   </Button>
                 )}
               </div>

@@ -176,6 +176,8 @@ export interface Proposal {
   termsAndConditions?: string[] | null
   status: ProposalStatus
   shareToken?: string | null
+  version: number
+  rootProposalId?: string | null
   userId: string
   createdAt: string
   updatedAt: string

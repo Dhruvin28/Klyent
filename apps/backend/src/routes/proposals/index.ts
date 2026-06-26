@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { eq, and, desc, count } from 'drizzle-orm'
+import { eq, and, desc, count, max } from 'drizzle-orm'
 import { db, proposals, users } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 
@@ -69,6 +69,8 @@ async function getProposalWithCompany(whereClause: ReturnType<typeof and>) {
     termsAndConditions: proposals.termsAndConditions,
     status: proposals.status,
     shareToken: proposals.shareToken,
+    version: proposals.version,
+    rootProposalId: proposals.rootProposalId,
     userId: proposals.userId,
     createdAt: proposals.createdAt,
     updatedAt: proposals.updatedAt,
@@ -146,10 +148,55 @@ export default async function proposalRoutes(app: FastifyInstance) {
         ...rest,
         feesAmount: String(feesAmount),
         status: rest.status ?? 'DRAFT',
+        version: 1,
+        rootProposalId: id, // a brand new proposal is the root of its own version lineage
         userId,
       })
 
       const [created] = await db.select().from(proposals).where(eq(proposals.id, id)).limit(1)
+      return reply.code(201).send({ data: { ...created, feesAmount: Number(created.feesAmount) } })
+    })
+
+    // POST /api/proposals/:id/version — save edits as a new version of an existing proposal
+    priv.post('/:id/version', async (request, reply) => {
+      const userId = request.user.sub
+      const { id } = request.params as { id: string }
+      const result = createProposalSchema.safeParse(request.body)
+      if (!result.success) {
+        return reply.code(400).send({ error: 'Validation Error', details: result.error.flatten().fieldErrors })
+      }
+
+      // The source proposal must exist and belong to the user.
+      const [source] = await db.select({ id: proposals.id, rootProposalId: proposals.rootProposalId })
+        .from(proposals)
+        .where(and(eq(proposals.id, id), eq(proposals.userId, userId)))
+        .limit(1)
+      if (!source) return reply.code(404).send({ error: 'Proposal not found' })
+
+      // All versions share the same root; fall back to the source id for legacy rows.
+      const rootProposalId = source.rootProposalId ?? source.id
+
+      // Next version = highest existing version in this lineage + 1.
+      const [{ maxVersion }] = await db.select({ maxVersion: max(proposals.version) })
+        .from(proposals)
+        .where(and(eq(proposals.rootProposalId, rootProposalId), eq(proposals.userId, userId)))
+      const nextVersion = (Number(maxVersion) || 1) + 1
+
+      const { feesAmount, ...rest } = result.data
+      const newId = crypto.randomUUID()
+
+      await db.insert(proposals).values({
+        id: newId,
+        ...rest,
+        feesAmount: String(feesAmount),
+        status: rest.status ?? 'DRAFT',
+        shareToken: null, // each version gets its own share link when shared
+        version: nextVersion,
+        rootProposalId,
+        userId,
+      })
+
+      const [created] = await db.select().from(proposals).where(eq(proposals.id, newId)).limit(1)
       return reply.code(201).send({ data: { ...created, feesAmount: Number(created.feesAmount) } })
     })
 

@@ -205,6 +205,10 @@ export const proposals = mysqlTable(
     termsAndConditions: json('terms_and_conditions').$type<string[]>(),
     status: mysqlEnum('status', ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED']).notNull().default('DRAFT'),
     shareToken: varchar('share_token', { length: 128 }).unique(),
+    // Versioning: all versions of a proposal share the same rootProposalId
+    // (which equals the id of the very first version). version starts at 1.
+    version: int('version').notNull().default(1),
+    rootProposalId: varchar('root_proposal_id', { length: 128 }),
     userId: varchar('user_id', { length: 128 }).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
@@ -213,6 +217,7 @@ export const proposals = mysqlTable(
     userIdIdx: index('proposals_user_id_idx').on(table.userId),
     statusIdx: index('proposals_status_idx').on(table.status),
     shareTokenIdx: uniqueIndex('proposals_share_token_idx').on(table.shareToken),
+    rootProposalIdIdx: index('proposals_root_proposal_id_idx').on(table.rootProposalId),
   })
 )
 

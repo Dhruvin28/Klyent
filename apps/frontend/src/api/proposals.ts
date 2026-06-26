@@ -63,6 +63,12 @@ export const proposalsApi = {
     return res.data.data
   },
 
+  // Save the given data as a new version of an existing proposal (same lineage).
+  createVersion: async (id: string, data: CreateProposalData): Promise<Proposal> => {
+    const res = await api.post<{ data: Proposal }>(`/proposals/${id}/version`, data)
+    return res.data.data
+  },
+
   updateProposal: async (id: string, data: Partial<CreateProposalData>): Promise<Proposal> => {
     const res = await api.patch<{ data: Proposal }>(`/proposals/${id}`, data)
     return res.data.data
