@@ -8,6 +8,7 @@ import { FilesPage } from '@/pages/FilesPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { SharePage } from '@/pages/SharePage'
 import { FreelancePage } from '@/pages/FreelancePage'
 import { FreelanceDetailPage } from '@/pages/FreelanceDetailPage'
@@ -24,6 +25,7 @@ export default function App() {
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* Public share routes */}
         <Route path="/share/:token" element={<SharePage />} />

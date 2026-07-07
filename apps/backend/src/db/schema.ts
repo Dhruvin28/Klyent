@@ -26,6 +26,8 @@ export const users = mysqlTable(
     companyAddress: text('company_address'),
     companyWebsite: varchar('company_website', { length: 500 }),
     companyGstin: varchar('company_gstin', { length: 20 }),
+    passwordResetOtpHash: varchar('password_reset_otp_hash', { length: 255 }),
+    passwordResetOtpExpiresAt: timestamp('password_reset_otp_expires_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
   },

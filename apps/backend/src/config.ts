@@ -14,6 +14,10 @@ export const config = {
     bucket: process.env.R2_BUCKET_NAME ?? '',
     publicUrl: process.env.R2_PUBLIC_URL ?? '',
   },
+  smtp: {
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+  },
   uploadMaxSize: 50 * 1024 * 1024, // 50MB
   allowedMimeTypes: [
     'application/pdf',

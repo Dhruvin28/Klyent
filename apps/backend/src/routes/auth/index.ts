@@ -1,12 +1,18 @@
 import { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
+import { randomInt } from 'crypto'
 import { z } from 'zod'
 import { eq, and, ne } from 'drizzle-orm'
 import { db, users } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 import { uploadToS3, deleteS3Object, s3Client } from '../../lib/s3'
+import { sendOtpEmail } from '../../lib/mailer'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { config } from '../../config'
+
+const OTP_EXPIRY_MS = 10 * 60 * 1000
+const RESET_TOKEN_EXPIRY = '15m'
+const RESET_TOKEN_PURPOSE = 'password_reset'
 
 const USER_SELECT = {
   id: users.id,
@@ -56,6 +62,24 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 })
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email address'),
+})
+
+const verifyOtpSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  otp: z.string().length(6, 'OTP must be 6 digits'),
+})
+
+const resetPasswordSchema = z.object({
+  resetToken: z.string().min(1, 'Reset token is required'),
+  newPassword: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number'),
+})
+
 export default async function authRoutes(app: FastifyInstance) {
   // POST /api/auth/register
   app.post('/register', async (request, reply) => {
@@ -95,6 +119,87 @@ export default async function authRoutes(app: FastifyInstance) {
     const token = await reply.jwtSign({ sub: row.id, email: row.email, role: row.role })
     const [user] = await db.select(USER_SELECT).from(users).where(eq(users.id, row.id)).limit(1)
     return reply.send({ token, user })
+  })
+
+  // POST /api/auth/forgot-password — sends a 6-digit OTP to the account email
+  app.post('/forgot-password', async (request, reply) => {
+    const result = forgotPasswordSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.code(400).send({ error: 'Validation Error', details: result.error.flatten().fieldErrors })
+    }
+
+    const { email } = result.data
+    const genericResponse = { message: 'If an account exists for that email, an OTP has been sent.' }
+
+    const [row] = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    if (!row) return reply.send(genericResponse)
+
+    const otp = randomInt(100000, 1000000).toString()
+    const otpHash = await bcrypt.hash(otp, 10)
+    await db.update(users).set({
+      passwordResetOtpHash: otpHash,
+      passwordResetOtpExpiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
+    }).where(eq(users.id, row.id))
+
+    await sendOtpEmail(row.email, otp)
+    return reply.send(genericResponse)
+  })
+
+  // POST /api/auth/verify-otp — validates the OTP and issues a short-lived reset token
+  app.post('/verify-otp', async (request, reply) => {
+    const result = verifyOtpSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.code(400).send({ error: 'Validation Error', details: result.error.flatten().fieldErrors })
+    }
+
+    const { email, otp } = result.data
+    const [row] = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    if (!row || !row.passwordResetOtpHash || !row.passwordResetOtpExpiresAt) {
+      return reply.code(400).send({ error: 'Invalid or expired OTP' })
+    }
+    if (row.passwordResetOtpExpiresAt.getTime() < Date.now()) {
+      return reply.code(400).send({ error: 'Invalid or expired OTP' })
+    }
+
+    const validOtp = await bcrypt.compare(otp, row.passwordResetOtpHash)
+    if (!validOtp) return reply.code(400).send({ error: 'Invalid or expired OTP' })
+
+    // OTP is single-use — clear it now that it's been consumed
+    await db.update(users).set({
+      passwordResetOtpHash: null,
+      passwordResetOtpExpiresAt: null,
+    }).where(eq(users.id, row.id))
+
+    const resetToken = app.jwt.sign(
+      { sub: row.id, purpose: RESET_TOKEN_PURPOSE },
+      { expiresIn: RESET_TOKEN_EXPIRY }
+    )
+    return reply.send({ resetToken })
+  })
+
+  // POST /api/auth/reset-password — consumes the reset token and sets the new password
+  app.post('/reset-password', async (request, reply) => {
+    const result = resetPasswordSchema.safeParse(request.body)
+    if (!result.success) {
+      return reply.code(400).send({ error: 'Validation Error', details: result.error.flatten().fieldErrors })
+    }
+
+    const { resetToken, newPassword } = result.data
+    let payload: { sub: string; purpose: string }
+    try {
+      payload = app.jwt.verify(resetToken)
+    } catch {
+      return reply.code(400).send({ error: 'Invalid or expired reset token' })
+    }
+    if (payload.purpose !== RESET_TOKEN_PURPOSE) {
+      return reply.code(400).send({ error: 'Invalid or expired reset token' })
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.id, payload.sub)).limit(1)
+    if (!user) return reply.code(404).send({ error: 'User not found' })
+
+    await db.update(users).set({ password: await bcrypt.hash(newPassword, 12) }).where(eq(users.id, user.id))
+    return reply.send({ message: 'Password updated successfully' })
   })
 
   // GET /api/auth/me
