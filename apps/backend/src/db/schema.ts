@@ -185,6 +185,7 @@ export const proposals = mysqlTable(
   'proposals',
   {
     id: varchar('id', { length: 128 }).primaryKey(),
+    proposalType: mysqlEnum('proposal_type', ['STANDARD', 'COST_BREAKUP']).notNull().default('STANDARD'),
     proposalNumber: varchar('proposal_number', { length: 100 }).notNull(),
     serviceType: varchar('service_type', { length: 200 }).notNull(),
     date: varchar('date', { length: 10 }).notNull(),
@@ -205,6 +206,9 @@ export const proposals = mysqlTable(
     feesNote: text('fees_note'),
     paymentMilestones: json('payment_milestones').$type<{ milestone: number; description: string; percentage: number; amount: number }[]>(),
     termsAndConditions: json('terms_and_conditions').$type<string[]>(),
+    // COST_BREAKUP proposals only:
+    materialSections: json('material_sections').$type<{ id: string; title: string; rateLabel: string; items: { srNo: number; description: string; rate?: string | null }[] }[]>(),
+    costBreakupItems: json('cost_breakup_items').$type<{ item: string; description: string; amount: number }[]>(),
     status: mysqlEnum('status', ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED']).notNull().default('DRAFT'),
     shareToken: varchar('share_token', { length: 128 }).unique(),
     // Versioning: all versions of a proposal share the same rootProposalId

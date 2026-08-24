@@ -1,21 +1,28 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, FileText, Download, Share2, Trash2, Eye, Copy, Check, GitBranch } from 'lucide-react'
+import { Plus, FileText, Download, Share2, Trash2, Eye, Copy, Check, GitBranch, ChevronDown, LayoutList } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import { ProposalPDF } from '@/components/proposals/ProposalPDF'
+import { CostBreakupProposalPDF } from '@/components/proposals/CostBreakupProposalPDF'
 import { proposalsApi } from '@/api/proposals'
 import { useToast } from '@/components/ui/toast'
 import { useLogoDataUrl } from '@/hooks/useLogoDataUrl'
 import { formatDate } from '@/lib/utils'
 import type { Proposal } from '@/types'
+
+// Route to create a new proposal of the same kind as an existing one.
+function newProposalPath(proposalType: Proposal['proposalType']): string {
+  return proposalType === 'COST_BREAKUP' ? '/proposals/new/cost-breakup' : '/proposals/new'
+}
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
@@ -73,6 +80,9 @@ function ProposalCard({ proposal, onDelete, logoDataUrl }: { proposal: Proposal;
                 {proposal.version > 1 && (
                   <Badge className="border-transparent bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400">v{proposal.version}</Badge>
                 )}
+                {proposal.proposalType === 'COST_BREAKUP' && (
+                  <Badge className="border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Cost Breakup</Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{proposal.proposalNumber} · {proposal.serviceType}</p>
               <p className="text-xs text-muted-foreground">
@@ -98,7 +108,9 @@ function ProposalCard({ proposal, onDelete, logoDataUrl }: { proposal: Proposal;
           </Button>
 
           <PDFDownloadLink
-            document={<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />}
+            document={proposal.proposalType === 'COST_BREAKUP'
+              ? <CostBreakupProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />
+              : <ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />}
             fileName={`Proposal-${proposal.proposalNumber}.pdf`}
           >
             {({ loading }) => (
@@ -112,7 +124,7 @@ function ProposalCard({ proposal, onDelete, logoDataUrl }: { proposal: Proposal;
 
           <Button
             variant="ghost" size="sm"
-            onClick={() => navigate(`/proposals/new?copyFrom=${proposal.id}`)}
+            onClick={() => navigate(`${newProposalPath(proposal.proposalType)}?copyFrom=${proposal.id}`)}
             title="Duplicate as a new proposal"
           >
             <Copy className="h-4 w-4" />
@@ -120,7 +132,7 @@ function ProposalCard({ proposal, onDelete, logoDataUrl }: { proposal: Proposal;
 
           <Button
             variant="ghost" size="sm"
-            onClick={() => navigate(`/proposals/new?versionOf=${proposal.id}`)}
+            onClick={() => navigate(`${newProposalPath(proposal.proposalType)}?versionOf=${proposal.id}`)}
             title="Create a new version"
           >
             <GitBranch className="h-4 w-4" />
@@ -180,10 +192,31 @@ export function ProposalsPage() {
           <h2 className="text-lg font-semibold">Proposals</h2>
           <p className="text-sm text-muted-foreground">Create and manage client proposals with PDF export and sharing</p>
         </div>
-        <Button onClick={() => navigate('/proposals/new')} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          New Proposal
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              New Proposal
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuItem onClick={() => navigate('/proposals/new')} className="gap-2 py-2.5">
+              <FileText className="h-4 w-4" />
+              <div>
+                <p className="font-medium">Standard Proposal</p>
+                <p className="text-xs text-muted-foreground">Scope, fees & payment milestones</p>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/proposals/new/cost-breakup')} className="gap-2 py-2.5">
+              <LayoutList className="h-4 w-4" />
+              <div>
+                <p className="font-medium">Cost Breakup Estimate</p>
+                <p className="text-xs text-muted-foreground">Itemized material rates & final cost breakup</p>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Filter */}

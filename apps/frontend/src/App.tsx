@@ -14,6 +14,7 @@ import { FreelancePage } from '@/pages/FreelancePage'
 import { FreelanceDetailPage } from '@/pages/FreelanceDetailPage'
 import { ProposalsPage } from '@/pages/ProposalsPage'
 import { CreateProposalPage } from '@/pages/CreateProposalPage'
+import { CreateCostBreakupProposalPage } from '@/pages/CreateCostBreakupProposalPage'
 import { ProposalDetailPage } from '@/pages/ProposalDetailPage'
 import { ProposalSharePage } from '@/pages/ProposalSharePage'
 import { Toaster } from '@/components/ui/toast'
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/freelance/:id" element={<FreelanceDetailPage />} />
           <Route path="/proposals" element={<ProposalsPage />} />
           <Route path="/proposals/new" element={<CreateProposalPage />} />
+          <Route path="/proposals/new/cost-breakup" element={<CreateCostBreakupProposalPage />} />
           <Route path="/proposals/:id" element={<ProposalDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>

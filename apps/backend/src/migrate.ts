@@ -178,6 +178,11 @@ const ALTER_COLUMNS: [string, string, string][] = [
   ['users', 'company_gstin',    'VARCHAR(20)'],
   ['payments', 'freelance_project_id', 'VARCHAR(128)'],
   ['files',    'freelance_project_id', 'VARCHAR(128)'],
+  ['proposals', 'proposal_type', "ENUM('STANDARD','COST_BREAKUP') NOT NULL DEFAULT 'STANDARD'"],
+  ['proposals', 'material_sections', 'JSON'],
+  ['proposals', 'cost_breakup_items', 'JSON'],
+  ['proposals', 'version', 'INT NOT NULL DEFAULT 1'],
+  ['proposals', 'root_proposal_id', 'VARCHAR(128)'],
 ]
 
 // Columns to make nullable if currently NOT NULL: [table, column, varchar-definition]

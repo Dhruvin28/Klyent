@@ -1,5 +1,5 @@
 import { api, publicApi } from '@/lib/axios'
-import type { Proposal, PaginatedResponse } from '@/types'
+import type { Proposal, PaginatedResponse, ProposalType, MaterialSection, CostBreakupItem } from '@/types'
 
 export interface ProposalParams {
   status?: string
@@ -8,6 +8,9 @@ export interface ProposalParams {
 }
 
 export interface CreateProposalData {
+  proposalType?: ProposalType
+  materialSections?: MaterialSection[] | null
+  costBreakupItems?: CostBreakupItem[] | null
   proposalNumber: string
   serviceType: string
   date: string

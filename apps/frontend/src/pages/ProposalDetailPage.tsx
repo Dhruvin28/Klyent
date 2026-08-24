@@ -4,6 +4,7 @@ import { ChevronLeft, Download, Share2, Check, Trash2, FileText, Copy, GitBranch
 import { useState } from 'react'
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer'
 import { ProposalPDF } from '@/components/proposals/ProposalPDF'
+import { CostBreakupProposalPDF } from '@/components/proposals/CostBreakupProposalPDF'
 import { useLogoDataUrl } from '@/hooks/useLogoDataUrl'
 import { proposalsApi } from '@/api/proposals'
 import { Button } from '@/components/ui/button'
@@ -78,6 +79,9 @@ export function ProposalDetailPage() {
     )
   }
 
+  const newProposalPath = proposal.proposalType === 'COST_BREAKUP' ? '/proposals/new/cost-breakup' : '/proposals/new'
+  const PDFComponent = proposal.proposalType === 'COST_BREAKUP' ? CostBreakupProposalPDF : ProposalPDF
+
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
       {/* Header */}
@@ -92,15 +96,18 @@ export function ProposalDetailPage() {
             {proposal.version > 1 && (
               <Badge className="border-transparent bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400">v{proposal.version}</Badge>
             )}
+            {proposal.proposalType === 'COST_BREAKUP' && (
+              <Badge className="border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Cost Breakup</Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">{proposal.proposalNumber} · {proposal.serviceType}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => navigate(`/proposals/new?copyFrom=${proposal.id}`)}>
+          <Button variant="outline" size="sm" onClick={() => navigate(`${newProposalPath}?copyFrom=${proposal.id}`)}>
             <Copy className="h-4 w-4 mr-1" /> Copy
           </Button>
 
-          <Button variant="outline" size="sm" onClick={() => navigate(`/proposals/new?versionOf=${proposal.id}`)}>
+          <Button variant="outline" size="sm" onClick={() => navigate(`${newProposalPath}?versionOf=${proposal.id}`)}>
             <GitBranch className="h-4 w-4 mr-1" /> New Version
           </Button>
 
@@ -110,7 +117,7 @@ export function ProposalDetailPage() {
           </Button>
 
           <PDFDownloadLink
-            document={<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />}
+            document={<PDFComponent proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />}
             fileName={`Proposal-${proposal.proposalNumber}.pdf`}
           >
             {({ loading }) => (
@@ -134,7 +141,7 @@ export function ProposalDetailPage() {
       {/* PDF Viewer */}
       <div className="rounded-lg overflow-hidden shadow border border-border" style={{ height: '80vh' }}>
         <PDFViewer width="100%" height="100%" showToolbar={false}>
-          <ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />
+          <PDFComponent proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />
         </PDFViewer>
       </div>
 

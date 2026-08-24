@@ -11,7 +11,29 @@ const paymentMilestoneSchema = z.object({
   amount: z.number().min(0),
 })
 
+const materialItemSchema = z.object({
+  srNo: z.number().int(),
+  description: z.string().max(500),
+  rate: z.string().max(100).optional().nullable(),
+})
+
+const materialSectionSchema = z.object({
+  id: z.string().max(64),
+  title: z.string().min(1).max(100),
+  rateLabel: z.string().max(50).optional().default('Rate'),
+  items: z.array(materialItemSchema),
+})
+
+const costBreakupItemSchema = z.object({
+  item: z.string().min(1).max(200),
+  description: z.string().max(1000),
+  amount: z.number().min(0),
+})
+
 const createProposalSchema = z.object({
+  proposalType: z.enum(['STANDARD', 'COST_BREAKUP']).optional().default('STANDARD'),
+  materialSections: z.array(materialSectionSchema).optional().nullable(),
+  costBreakupItems: z.array(costBreakupItemSchema).optional().nullable(),
   proposalNumber: z.string().min(1).max(100),
   serviceType: z.string().min(1).max(200),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -47,6 +69,9 @@ const listQuerySchema = z.object({
 async function getProposalWithCompany(whereClause: ReturnType<typeof and>) {
   const [row] = await db.select({
     id: proposals.id,
+    proposalType: proposals.proposalType,
+    materialSections: proposals.materialSections,
+    costBreakupItems: proposals.costBreakupItems,
     proposalNumber: proposals.proposalNumber,
     serviceType: proposals.serviceType,
     date: proposals.date,

@@ -4,9 +4,18 @@ import { Download, AlertCircle, Layers } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import { ProposalPDF } from '@/components/proposals/ProposalPDF'
+import { CostBreakupProposalPDF } from '@/components/proposals/CostBreakupProposalPDF'
 import { fetchLogoAsDataUrl } from '@/lib/logoProxy'
 import { proposalsApi } from '@/api/proposals'
 import { Button } from '@/components/ui/button'
+import type { Proposal } from '@/types'
+
+function pdfDocumentFor(proposal: Proposal, companyLogoUrl: string | null) {
+  const p = { ...proposal, companyLogoUrl }
+  return proposal.proposalType === 'COST_BREAKUP'
+    ? <CostBreakupProposalPDF proposal={p} />
+    : <ProposalPDF proposal={p} />
+}
 
 // ── Renders the PDF as a blob URL inside a native <iframe> ──
 // This avoids PDFViewer's iframe-within-iframe quirks.
@@ -29,7 +38,7 @@ function PdfFrame({ token }: { token: string }) {
     ;(async () => {
       const logoDataUrl = await fetchLogoAsDataUrl(proposal.companyLogoUrl)
       if (cancelled) return
-      const blob = await pdf(<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />).toBlob()
+      const blob = await pdf(pdfDocumentFor(proposal, logoDataUrl)).toBlob()
       if (cancelled) return
       objectUrl = URL.createObjectURL(blob)
       setSrc(objectUrl)
@@ -74,7 +83,7 @@ export function ProposalSharePage() {
   const handleDownload = async () => {
     if (!proposal) return
     const logoDataUrl = await fetchLogoAsDataUrl(proposal.companyLogoUrl)
-    const blob = await pdf(<ProposalPDF proposal={{ ...proposal, companyLogoUrl: logoDataUrl }} />).toBlob()
+    const blob = await pdf(pdfDocumentFor(proposal, logoDataUrl)).toBlob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

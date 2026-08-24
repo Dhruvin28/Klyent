@@ -144,6 +144,7 @@ export interface FreelanceProject {
 }
 
 export type ProposalStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED'
+export type ProposalType = 'STANDARD' | 'COST_BREAKUP'
 
 export interface PaymentMilestone {
   milestone: number
@@ -152,8 +153,30 @@ export interface PaymentMilestone {
   amount: number
 }
 
+export interface MaterialItem {
+  srNo: number
+  description: string
+  rate?: string | null
+}
+
+export interface MaterialSection {
+  id: string
+  title: string
+  rateLabel: string
+  items: MaterialItem[]
+}
+
+export interface CostBreakupItem {
+  item: string
+  description: string
+  amount: number
+}
+
 export interface Proposal {
   id: string
+  proposalType: ProposalType
+  materialSections?: MaterialSection[] | null
+  costBreakupItems?: CostBreakupItem[] | null
   proposalNumber: string
   serviceType: string
   date: string

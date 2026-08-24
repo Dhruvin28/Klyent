@@ -421,6 +421,7 @@ export function CreateProposalPage() {
   const back = () => setStep((s) => Math.max(s - 1, 1))
 
   const buildPayload = () => ({
+    proposalType: 'STANDARD' as const,
     proposalNumber: form.proposalNumber,
     serviceType: form.serviceType,
     date: form.date,
