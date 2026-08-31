@@ -244,3 +244,82 @@ export const freelanceWorkLogs = mysqlTable(
     dateIdx: index('freelance_work_logs_date_idx').on(table.date),
   })
 )
+
+export const invoices = mysqlTable(
+  'invoices',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    invoiceNumber: varchar('invoice_number', { length: 100 }).notNull(),
+    invoiceDate: varchar('invoice_date', { length: 10 }).notNull(),
+    dueDate: varchar('due_date', { length: 10 }).notNull(),
+
+    // Buyer ("Bill To"). clientId is optional — an invoice can be raised for a
+    // one-off buyer who is not a saved client. Details are snapshotted either
+    // way so editing a client later never rewrites an issued invoice.
+    clientId: varchar('client_id', { length: 128 }),
+    clientName: varchar('client_name', { length: 200 }).notNull(),
+    clientPhone: varchar('client_phone', { length: 50 }),
+    clientEmail: varchar('client_email', { length: 255 }),
+    clientAddress: text('client_address'),
+    clientGstin: varchar('client_gstin', { length: 20 }),
+
+    // GST place-of-supply. Same state code => CGST + SGST, different => IGST.
+    supplierStateCode: varchar('supplier_state_code', { length: 2 }),
+    supplierStateName: varchar('supplier_state_name', { length: 100 }),
+    placeOfSupplyCode: varchar('place_of_supply_code', { length: 2 }),
+    placeOfSupplyName: varchar('place_of_supply_name', { length: 100 }),
+    isInterState: boolean('is_inter_state').notNull().default(false),
+
+    lineItems: json('line_items').$type<
+      {
+        id: string
+        description: string
+        hsnSac?: string | null
+        quantity: number
+        unit?: string | null
+        rate: number
+        discountPercent: number
+        taxRate: number
+      }[]
+    >(),
+
+    // Server-computed totals, stored so an issued invoice is immutable history.
+    subtotal: decimal('subtotal', { precision: 15, scale: 2 }).notNull().default('0'),
+    discountTotal: decimal('discount_total', { precision: 15, scale: 2 }).notNull().default('0'),
+    taxableAmount: decimal('taxable_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    cgstAmount: decimal('cgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    sgstAmount: decimal('sgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    igstAmount: decimal('igst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalTax: decimal('total_tax', { precision: 15, scale: 2 }).notNull().default('0'),
+    roundOff: decimal('round_off', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    amountInWords: varchar('amount_in_words', { length: 500 }),
+
+    // Payments are not linked to invoices (see notes); amountPaid is recorded
+    // by hand so an invoice can still show a balance and a PART_PAID status.
+    amountPaid: decimal('amount_paid', { precision: 15, scale: 2 }).notNull().default('0'),
+
+    notes: text('notes'),
+    termsAndConditions: json('terms_and_conditions').$type<string[]>(),
+    bankName: varchar('bank_name', { length: 200 }),
+    bankAccountName: varchar('bank_account_name', { length: 200 }),
+    bankAccountNumber: varchar('bank_account_number', { length: 50 }),
+    bankIfsc: varchar('bank_ifsc', { length: 20 }),
+    upiId: varchar('upi_id', { length: 100 }),
+
+    status: mysqlEnum('status', ['DRAFT', 'SENT', 'PART_PAID', 'PAID', 'OVERDUE', 'CANCELLED'])
+      .notNull()
+      .default('DRAFT'),
+    shareToken: varchar('share_token', { length: 128 }).unique(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('invoices_user_id_idx').on(table.userId),
+    statusIdx: index('invoices_status_idx').on(table.status),
+    clientIdIdx: index('invoices_client_id_idx').on(table.clientId),
+    shareTokenIdx: uniqueIndex('invoices_share_token_idx').on(table.shareToken),
+    numberIdx: index('invoices_number_idx').on(table.invoiceNumber),
+  })
+)

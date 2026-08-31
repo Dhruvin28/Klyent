@@ -222,3 +222,163 @@ export interface FreelanceWorkLog {
   createdAt: string
   updatedAt: string
 }
+
+export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PART_PAID' | 'PAID' | 'OVERDUE' | 'CANCELLED'
+
+export interface InvoiceLineItem {
+  id: string
+  description: string
+  hsnSac?: string | null
+  quantity: number
+  unit?: string | null
+  rate: number
+  discountPercent: number
+  taxRate: number
+}
+
+export interface Invoice {
+  id: string
+  invoiceNumber: string
+  invoiceDate: string
+  dueDate: string
+
+  clientId?: string | null
+  clientName: string
+  clientPhone?: string | null
+  clientEmail?: string | null
+  clientAddress?: string | null
+  clientGstin?: string | null
+
+  supplierStateCode?: string | null
+  supplierStateName?: string | null
+  placeOfSupplyCode?: string | null
+  placeOfSupplyName?: string | null
+  isInterState: boolean
+
+  lineItems?: InvoiceLineItem[] | null
+
+  subtotal: number
+  discountTotal: number
+  taxableAmount: number
+  cgstAmount: number
+  sgstAmount: number
+  igstAmount: number
+  totalTax: number
+  roundOff: number
+  totalAmount: number
+  amountInWords?: string | null
+  amountPaid: number
+  balanceDue: number
+
+  notes?: string | null
+  termsAndConditions?: string[] | null
+  bankName?: string | null
+  bankAccountName?: string | null
+  bankAccountNumber?: string | null
+  bankIfsc?: string | null
+  upiId?: string | null
+
+  status: InvoiceStatus
+  shareToken?: string | null
+  userId: string
+  createdAt: string
+  updatedAt: string
+  // joined from user
+  companyName?: string | null
+  companyLogoUrl?: string | null
+  companyPhone?: string | null
+  companyAddress?: string | null
+  companyWebsite?: string | null
+  companyGstin?: string | null
+}
+
+export interface InvoiceSummary {
+  billed: number
+  collected: number
+  outstanding: number
+}
+
+// ── Business report (dashboard export) ──────────────────────
+export interface ReportCompany {
+  name: string
+  email: string
+  companyName?: string | null
+  companyLogoUrl?: string | null
+  companyPhone?: string | null
+  companyAddress?: string | null
+  companyWebsite?: string | null
+  companyGstin?: string | null
+}
+
+export interface ReportClientRow {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  status: ClientStatus
+  projectDescription?: string | null
+  totalDealAmount: number
+  totalPaid: number
+  pending: number
+  paymentCount: number
+  lastPaymentDate?: string | null
+  createdAt: string
+}
+
+export interface ReportPaymentRow {
+  id: string
+  amount: number
+  method: PaymentMethod
+  date: string
+  notes?: string | null
+  counterparty: string
+  source: 'CLIENT' | 'FREELANCE' | 'OTHER'
+  workType?: string | null
+}
+
+export interface ReportFreelanceRow {
+  id: string
+  clientName: string
+  workType: string
+  chargeType: string
+  rate: number
+  status: FreelanceStatus
+  billed: number
+  paid: number
+  pending: number
+  createdAt: string
+}
+
+export interface ReportSummary {
+  totalClients: number
+  activeClients: number
+  completedClients: number
+  onHoldClients: number
+  totalDealValue: number
+  totalRevenue: number
+  pendingPayments: number
+  totalReceived: number
+  paymentCount: number
+  freelanceProjects: number
+  freelanceActiveProjects: number
+  freelanceBilled: number
+  freelancePaid: number
+  freelancePending: number
+  invoiceCount: number
+  invoiceBilled: number
+  invoiceCollected: number
+  invoiceOutstanding: number
+  proposalCount: number
+  proposalsByStatus: Record<string, number>
+}
+
+export interface BusinessReport {
+  generatedAt: string
+  company: ReportCompany | null
+  summary: ReportSummary
+  clients: ReportClientRow[]
+  payments: ReportPaymentRow[]
+  freelanceProjects: ReportFreelanceRow[]
+  paymentMethods: { method: string; count: number; total: number }[]
+  monthlyRevenue: { month: number; year: number; total: number }[]
+}

@@ -17,6 +17,10 @@ import { CreateProposalPage } from '@/pages/CreateProposalPage'
 import { CreateCostBreakupProposalPage } from '@/pages/CreateCostBreakupProposalPage'
 import { ProposalDetailPage } from '@/pages/ProposalDetailPage'
 import { ProposalSharePage } from '@/pages/ProposalSharePage'
+import { InvoicesPage } from '@/pages/InvoicesPage'
+import { CreateInvoicePage } from '@/pages/CreateInvoicePage'
+import { InvoiceDetailPage } from '@/pages/InvoiceDetailPage'
+import { InvoiceSharePage } from '@/pages/InvoiceSharePage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -31,6 +35,7 @@ export default function App() {
         {/* Public share routes */}
         <Route path="/share/:token" element={<SharePage />} />
         <Route path="/proposals/share/:token" element={<ProposalSharePage />} />
+        <Route path="/invoices/share/:token" element={<InvoiceSharePage />} />
 
         {/* Protected app routes */}
         <Route element={<AppLayout />}>
@@ -45,6 +50,9 @@ export default function App() {
           <Route path="/proposals/new" element={<CreateProposalPage />} />
           <Route path="/proposals/new/cost-breakup" element={<CreateCostBreakupProposalPage />} />
           <Route path="/proposals/:id" element={<ProposalDetailPage />} />
+          <Route path="/invoices" element={<InvoicesPage />} />
+          <Route path="/invoices/new" element={<CreateInvoicePage />} />
+          <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 

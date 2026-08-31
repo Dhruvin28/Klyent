@@ -15,6 +15,7 @@ import dashboardRoutes from './routes/dashboard'
 import activityRoutes from './routes/activity'
 import freelanceRoutes from './routes/freelance'
 import proposalRoutes from './routes/proposals'
+import invoiceRoutes from './routes/invoices'
 
 // Augment FastifyRequest to include JWT user payload
 declare module '@fastify/jwt' {
@@ -98,6 +99,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(activityRoutes, { prefix: '/api/activity' })
   await app.register(freelanceRoutes, { prefix: '/api/freelance' })
   await app.register(proposalRoutes, { prefix: '/api/proposals' })
+  await app.register(invoiceRoutes, { prefix: '/api/invoices' })
 
   // Serve frontend static files in production
   const frontendDist = path.join(__dirname, '../../frontend/dist')

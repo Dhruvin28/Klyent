@@ -5,6 +5,7 @@ import { RevenueChart } from '@/components/dashboard/RevenueChart'
 import { ClientGrowthChart } from '@/components/dashboard/ClientGrowthChart'
 import { RecentActivity } from '@/components/dashboard/RecentActivity'
 import { DashboardDetailModal, type DashboardTile } from '@/components/dashboard/DashboardDetailModal'
+import { ExportReportButton } from '@/components/dashboard/ExportReportButton'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -48,6 +49,15 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Page header — export lives here so it is reachable with or without a company banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Dashboard</h2>
+          <p className="text-sm text-muted-foreground">Your clients, payments and revenue at a glance</p>
+        </div>
+        <ExportReportButton />
+      </div>
+
       {/* Company banner */}
       {hasCompany && (
         <div className="flex items-center gap-4 rounded-xl border bg-card px-5 py-4">
