@@ -21,6 +21,9 @@ import { InvoicesPage } from '@/pages/InvoicesPage'
 import { CreateInvoicePage } from '@/pages/CreateInvoicePage'
 import { InvoiceDetailPage } from '@/pages/InvoiceDetailPage'
 import { InvoiceSharePage } from '@/pages/InvoiceSharePage'
+import { StudioProjectsPage } from '@/pages/studio/StudioProjectsPage'
+import { StudioProjectDetailPage } from '@/pages/studio/StudioProjectDetailPage'
+import { StudioAskPage } from '@/pages/studio/StudioAskPage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -54,6 +57,9 @@ export default function App() {
           <Route path="/invoices/new" element={<CreateInvoicePage />} />
           <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/studio" element={<StudioProjectsPage />} />
+          <Route path="/studio/ask" element={<StudioAskPage />} />
+          <Route path="/studio/:id" element={<StudioProjectDetailPage />} />
         </Route>
 
         {/* Catch-all redirect */}

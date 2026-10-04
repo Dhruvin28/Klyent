@@ -43,6 +43,103 @@ export interface Client {
   _count?: { payments: number; files: number }
 }
 
+// ---------------------------------------------------------------------
+// Studio AI — WhatsApp project knowledge engine
+// ---------------------------------------------------------------------
+
+export type StudioProjectStatus = 'ACTIVE' | 'ON_HOLD' | 'COMPLETED'
+
+export interface StudioProject {
+  id: string
+  name: string
+  clientName?: string | null
+  siteAddress?: string | null
+  projectType?: string | null
+  budget?: string | null
+  timelineNotes?: string | null
+  status: StudioProjectStatus
+  clientId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface StudioMessage {
+  id: string
+  source: string
+  groupName?: string | null
+  projectId?: string | null
+  sender?: string | null
+  messageType: string
+  content?: string | null
+  timestamp: string
+  createdAt: string
+}
+
+export interface StudioDocument {
+  id: string
+  projectId?: string | null
+  fileName: string
+  mimeType?: string | null
+  storageUrl: string
+  extractedText?: string | null
+  documentType?: string | null
+  ocrUsed: boolean
+  createdAt: string
+}
+
+export interface StudioTask {
+  id: string
+  projectId?: string | null
+  title: string
+  description?: string | null
+  assignedTo?: string | null
+  priority: 'low' | 'medium' | 'high'
+  status: 'open' | 'in_progress' | 'done' | 'cancelled'
+  dueDate?: string | null
+  createdAt: string
+}
+
+export interface StudioDecision {
+  id: string
+  projectId?: string | null
+  topic: string
+  decision: string
+  decisionBy?: string | null
+  createdAt: string
+}
+
+export interface StudioQuote {
+  id: string
+  projectId?: string | null
+  description?: string | null
+  price?: string | null
+  unit?: string | null
+  status: 'quoted' | 'revised' | 'approved' | 'rejected'
+  vendorName?: string | null
+  materialName?: string | null
+  createdAt: string
+}
+
+export interface StudioAskSource {
+  kind: string
+  id: string
+  label: string
+  excerpt: string
+}
+
+export interface StudioAskResponse {
+  answer: string
+  sources: StudioAskSource[]
+}
+
+export interface StudioImportResult {
+  totalLines: number
+  messagesIngested: number
+  mediaAttached: number
+  skippedSystemMessages: number
+  errors: string[]
+}
+
 export interface Payment {
   id: string
   amount: number

@@ -16,6 +16,19 @@ import activityRoutes from './routes/activity'
 import freelanceRoutes from './routes/freelance'
 import proposalRoutes from './routes/proposals'
 import invoiceRoutes from './routes/invoices'
+import studioProjectRoutes from './routes/studio/projects'
+import studioGroupRoutes from './routes/studio/groups'
+import studioMessageRoutes from './routes/studio/messages'
+import studioDocumentRoutes from './routes/studio/documents'
+import studioAskRoutes from './routes/studio/ask'
+import studioSearchRoutes from './routes/studio/search'
+import studioTaskRoutes from './routes/studio/tasks'
+import studioDecisionRoutes from './routes/studio/decisions'
+import studioQuoteRoutes from './routes/studio/quotes'
+import studioSummaryRoutes from './routes/studio/summary'
+import studioImportRoutes from './routes/studio/import'
+import studioSettingsRoutes from './routes/studio/settings'
+import studioWebhookRoutes from './routes/studio/webhook'
 
 // Augment FastifyRequest to include JWT user payload
 declare module '@fastify/jwt' {
@@ -100,6 +113,21 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(freelanceRoutes, { prefix: '/api/freelance' })
   await app.register(proposalRoutes, { prefix: '/api/proposals' })
   await app.register(invoiceRoutes, { prefix: '/api/invoices' })
+
+  // Studio AI — WhatsApp project knowledge engine
+  await app.register(studioProjectRoutes, { prefix: '/api/studio/projects' })
+  await app.register(studioGroupRoutes, { prefix: '/api/studio/groups' })
+  await app.register(studioMessageRoutes, { prefix: '/api/studio/messages' })
+  await app.register(studioDocumentRoutes, { prefix: '/api/studio/documents' })
+  await app.register(studioAskRoutes, { prefix: '/api/studio/ask' })
+  await app.register(studioSearchRoutes, { prefix: '/api/studio/search' })
+  await app.register(studioTaskRoutes, { prefix: '/api/studio/tasks' })
+  await app.register(studioDecisionRoutes, { prefix: '/api/studio/decisions' })
+  await app.register(studioQuoteRoutes, { prefix: '/api/studio/quotes' })
+  await app.register(studioSummaryRoutes, { prefix: '/api/studio/summary' })
+  await app.register(studioImportRoutes, { prefix: '/api/studio/import' })
+  await app.register(studioSettingsRoutes, { prefix: '/api/studio/settings' })
+  await app.register(studioWebhookRoutes, { prefix: '/webhooks/studio-whatsapp' })
 
   // Serve frontend static files in production
   const frontendDist = path.join(__dirname, '../../frontend/dist')

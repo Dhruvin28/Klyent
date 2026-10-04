@@ -28,6 +28,7 @@ export const users = mysqlTable(
     companyGstin: varchar('company_gstin', { length: 20 }),
     passwordResetOtpHash: varchar('password_reset_otp_hash', { length: 255 }),
     passwordResetOtpExpiresAt: timestamp('password_reset_otp_expires_at'),
+    studioIngestionKeyHash: varchar('studio_ingestion_key_hash', { length: 255 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
   },
@@ -242,6 +243,251 @@ export const freelanceWorkLogs = mysqlTable(
   (table) => ({
     projectIdIdx: index('freelance_work_logs_project_id_idx').on(table.freelanceProjectId),
     dateIdx: index('freelance_work_logs_date_idx').on(table.date),
+  })
+)
+
+// ---------------------------------------------------------------------
+// Studio AI — WhatsApp project knowledge engine (ported from the
+// "Interior Bot" / DesignAI prototype). Namespaced with `studio_` /
+// `studio*` to avoid any collision with the freelancer-SaaS domain above.
+// Every table is scoped by `userId` since Klyent is multi-tenant.
+// ---------------------------------------------------------------------
+
+export const studioProjects = mysqlTable(
+  'studio_projects',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    name: varchar('name', { length: 200 }).notNull(),
+    clientName: varchar('client_name', { length: 200 }),
+    siteAddress: text('site_address'),
+    projectType: varchar('project_type', { length: 100 }),
+    budget: decimal('budget', { precision: 15, scale: 2 }),
+    timelineNotes: text('timeline_notes'),
+    status: mysqlEnum('status', ['ACTIVE', 'ON_HOLD', 'COMPLETED']).notNull().default('ACTIVE'),
+    // Optional link to an existing Klyent client — not required.
+    clientId: varchar('client_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_projects_user_id_idx').on(table.userId),
+    statusIdx: index('studio_projects_status_idx').on(table.status),
+  })
+)
+
+export const studioWhatsappGroups = mysqlTable(
+  'studio_whatsapp_groups',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    externalGroupId: varchar('external_group_id', { length: 255 }), // WhatsApp group id once a live bridge is wired up
+    name: varchar('name', { length: 255 }).notNull(),
+    groupType: varchar('group_type', { length: 50 }), // client | contractor | vendor | site | architect | internal
+    projectId: varchar('project_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_whatsapp_groups_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_whatsapp_groups_project_id_idx').on(table.projectId),
+    externalGroupIdIdx: uniqueIndex('studio_whatsapp_groups_external_id_idx').on(table.externalGroupId),
+    nameUserIdx: index('studio_whatsapp_groups_name_user_idx').on(table.name, table.userId),
+  })
+)
+
+export const studioMessages = mysqlTable(
+  'studio_messages',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    source: varchar('source', { length: 50 }).notNull().default('whatsapp'), // whatsapp | manual_import
+    groupId: varchar('group_id', { length: 128 }),
+    groupName: varchar('group_name', { length: 255 }), // denormalized, kept even if the group row is deleted
+    projectId: varchar('project_id', { length: 128 }),
+    projectConfidence: decimal('project_confidence', { precision: 4, scale: 3 }),
+    sender: varchar('sender', { length: 255 }),
+    senderId: varchar('sender_id', { length: 255 }),
+    messageType: varchar('message_type', { length: 20 }).notNull().default('text'), // text|image|pdf|docx|xlsx|voice|video|location|contact|link
+    content: text('content'),
+    replyToMessageId: varchar('reply_to_message_id', { length: 128 }),
+    externalMessageId: varchar('external_message_id', { length: 255 }), // WhatsApp message id, for idempotency
+    embedding: json('embedding').$type<number[]>(),
+    timestamp: timestamp('timestamp').notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_messages_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_messages_project_id_idx').on(table.projectId),
+    groupIdIdx: index('studio_messages_group_id_idx').on(table.groupId),
+    timestampIdx: index('studio_messages_timestamp_idx').on(table.timestamp),
+    externalIdIdx: uniqueIndex('studio_messages_external_id_idx').on(table.externalMessageId),
+  })
+)
+
+export const studioMessageMedia = mysqlTable(
+  'studio_message_media',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    messageId: varchar('message_id', { length: 128 }).notNull(),
+    fileName: varchar('file_name', { length: 500 }),
+    mimeType: varchar('mime_type', { length: 255 }),
+    storageUrl: text('storage_url').notNull(),
+    mediaKind: varchar('media_kind', { length: 20 }), // image | audio | video | document
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    messageIdIdx: index('studio_message_media_message_id_idx').on(table.messageId),
+  })
+)
+
+export const studioDocuments = mysqlTable(
+  'studio_documents',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    projectConfidence: decimal('project_confidence', { precision: 4, scale: 3 }),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    fileName: varchar('file_name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }),
+    storageUrl: text('storage_url').notNull(),
+    extractedText: text('extracted_text'),
+    documentType: varchar('document_type', { length: 50 }), // boq|quotation|invoice|purchase_order|floor_plan|...|other
+    ocrUsed: boolean('ocr_used').notNull().default(false),
+    uploadedBy: varchar('uploaded_by', { length: 255 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_documents_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_documents_project_id_idx').on(table.projectId),
+  })
+)
+
+export const studioDocumentChunks = mysqlTable(
+  'studio_document_chunks',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    documentId: varchar('document_id', { length: 128 }).notNull(),
+    chunkIndex: int('chunk_index').notNull(),
+    content: text('content').notNull(),
+    embedding: json('embedding').$type<number[]>(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    documentIdIdx: index('studio_document_chunks_document_id_idx').on(table.documentId),
+  })
+)
+
+export const studioDecisions = mysqlTable(
+  'studio_decisions',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    topic: varchar('topic', { length: 500 }).notNull(),
+    decision: text('decision').notNull(),
+    decisionBy: varchar('decision_by', { length: 255 }),
+    decisionDate: timestamp('decision_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    sourceDocumentId: varchar('source_document_id', { length: 128 }),
+    confidence: decimal('confidence', { precision: 4, scale: 3 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_decisions_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_decisions_project_id_idx').on(table.projectId),
+  })
+)
+
+export const studioTasks = mysqlTable(
+  'studio_tasks',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    title: varchar('title', { length: 500 }).notNull(),
+    description: text('description'),
+    assignedTo: varchar('assigned_to', { length: 255 }),
+    priority: mysqlEnum('priority', ['low', 'medium', 'high']).notNull().default('medium'),
+    status: mysqlEnum('status', ['open', 'in_progress', 'done', 'cancelled']).notNull().default('open'),
+    dueDate: timestamp('due_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_tasks_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_tasks_project_id_idx').on(table.projectId),
+    statusIdx: index('studio_tasks_status_idx').on(table.status),
+  })
+)
+
+export const studioDeadlines = mysqlTable(
+  'studio_deadlines',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    description: text('description').notNull(),
+    dueDate: timestamp('due_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_deadlines_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_deadlines_project_id_idx').on(table.projectId),
+  })
+)
+
+export const studioVendors = mysqlTable(
+  'studio_vendors',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    contactInfo: text('contact_info'),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_vendors_user_id_idx').on(table.userId),
+    nameUserIdx: uniqueIndex('studio_vendors_name_user_idx').on(table.name, table.userId),
+  })
+)
+
+export const studioMaterials = mysqlTable(
+  'studio_materials',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    category: varchar('category', { length: 100 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_materials_user_id_idx').on(table.userId),
+  })
+)
+
+export const studioQuotes = mysqlTable(
+  'studio_quotes',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    vendorId: varchar('vendor_id', { length: 128 }),
+    materialId: varchar('material_id', { length: 128 }),
+    description: text('description'),
+    price: decimal('price', { precision: 15, scale: 2 }),
+    unit: varchar('unit', { length: 50 }), // sqft|piece|lumpsum|...
+    status: mysqlEnum('status', ['quoted', 'revised', 'approved', 'rejected']).notNull().default('quoted'),
+    quoteDate: timestamp('quote_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    sourceDocumentId: varchar('source_document_id', { length: 128 }),
+    confidence: decimal('confidence', { precision: 4, scale: 3 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_quotes_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_quotes_project_id_idx').on(table.projectId),
   })
 )
 

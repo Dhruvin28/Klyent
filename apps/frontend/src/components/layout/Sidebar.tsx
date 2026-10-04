@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, CreditCard, FolderOpen, LogOut, Moon, Sun, Layers, X, Briefcase, FileText, Receipt } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, FolderOpen, LogOut, Moon, Sun, Layers, X, Briefcase, FileText, Receipt, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ const navItems = [
   { to: '/freelance', label: 'Freelance', icon: Briefcase },
   { to: '/proposals', label: 'Proposals', icon: FileText },
   { to: '/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/studio', label: 'AI Studio', icon: Sparkles },
 ]
 
 interface SidebarProps {

@@ -214,6 +214,200 @@ const CREATE_STATEMENTS = [
     INDEX \`invoices_client_id_idx\` (\`client_id\`),
     INDEX \`invoices_number_idx\` (\`invoice_number\`)
   )`,
+  // -----------------------------------------------------------------
+  // Studio AI — WhatsApp project knowledge engine
+  // -----------------------------------------------------------------
+
+  `CREATE TABLE IF NOT EXISTS \`studio_projects\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(200) NOT NULL,
+    \`client_name\` VARCHAR(200),
+    \`site_address\` TEXT,
+    \`project_type\` VARCHAR(100),
+    \`budget\` DECIMAL(15,2),
+    \`timeline_notes\` TEXT,
+    \`status\` ENUM('ACTIVE','ON_HOLD','COMPLETED') NOT NULL DEFAULT 'ACTIVE',
+    \`client_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_projects_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_projects_status_idx\` (\`status\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_whatsapp_groups\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`external_group_id\` VARCHAR(255),
+    \`name\` VARCHAR(255) NOT NULL,
+    \`group_type\` VARCHAR(50),
+    \`project_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`studio_whatsapp_groups_external_id_idx\` (\`external_group_id\`),
+    INDEX \`studio_whatsapp_groups_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_whatsapp_groups_project_id_idx\` (\`project_id\`),
+    INDEX \`studio_whatsapp_groups_name_user_idx\` (\`name\`, \`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_messages\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`source\` VARCHAR(50) NOT NULL DEFAULT 'whatsapp',
+    \`group_id\` VARCHAR(128),
+    \`group_name\` VARCHAR(255),
+    \`project_id\` VARCHAR(128),
+    \`project_confidence\` DECIMAL(4,3),
+    \`sender\` VARCHAR(255),
+    \`sender_id\` VARCHAR(255),
+    \`message_type\` VARCHAR(20) NOT NULL DEFAULT 'text',
+    \`content\` TEXT,
+    \`reply_to_message_id\` VARCHAR(128),
+    \`external_message_id\` VARCHAR(255),
+    \`embedding\` JSON,
+    \`timestamp\` TIMESTAMP NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`studio_messages_external_id_idx\` (\`external_message_id\`),
+    INDEX \`studio_messages_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_messages_project_id_idx\` (\`project_id\`),
+    INDEX \`studio_messages_group_id_idx\` (\`group_id\`),
+    INDEX \`studio_messages_timestamp_idx\` (\`timestamp\`),
+    FULLTEXT INDEX \`studio_messages_content_fts\` (\`content\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_message_media\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`message_id\` VARCHAR(128) NOT NULL,
+    \`file_name\` VARCHAR(500),
+    \`mime_type\` VARCHAR(255),
+    \`storage_url\` TEXT NOT NULL,
+    \`media_kind\` VARCHAR(20),
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_message_media_message_id_idx\` (\`message_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_documents\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`project_confidence\` DECIMAL(4,3),
+    \`source_message_id\` VARCHAR(128),
+    \`file_name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255),
+    \`storage_url\` TEXT NOT NULL,
+    \`extracted_text\` TEXT,
+    \`document_type\` VARCHAR(50),
+    \`ocr_used\` TINYINT(1) NOT NULL DEFAULT 0,
+    \`uploaded_by\` VARCHAR(255),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_documents_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_documents_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_document_chunks\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`document_id\` VARCHAR(128) NOT NULL,
+    \`chunk_index\` INT NOT NULL,
+    \`content\` TEXT NOT NULL,
+    \`embedding\` JSON,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_document_chunks_document_id_idx\` (\`document_id\`),
+    FULLTEXT INDEX \`studio_document_chunks_content_fts\` (\`content\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_decisions\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`topic\` VARCHAR(500) NOT NULL,
+    \`decision\` TEXT NOT NULL,
+    \`decision_by\` VARCHAR(255),
+    \`decision_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`source_document_id\` VARCHAR(128),
+    \`confidence\` DECIMAL(4,3),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_decisions_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_decisions_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_tasks\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`title\` VARCHAR(500) NOT NULL,
+    \`description\` TEXT,
+    \`assigned_to\` VARCHAR(255),
+    \`priority\` ENUM('low','medium','high') NOT NULL DEFAULT 'medium',
+    \`status\` ENUM('open','in_progress','done','cancelled') NOT NULL DEFAULT 'open',
+    \`due_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_tasks_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_tasks_project_id_idx\` (\`project_id\`),
+    INDEX \`studio_tasks_status_idx\` (\`status\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_deadlines\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`description\` TEXT NOT NULL,
+    \`due_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_deadlines_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_deadlines_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_vendors\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`contact_info\` TEXT,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`studio_vendors_name_user_idx\` (\`name\`, \`user_id\`),
+    INDEX \`studio_vendors_user_id_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_materials\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`category\` VARCHAR(100),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_materials_user_id_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_quotes\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`vendor_id\` VARCHAR(128),
+    \`material_id\` VARCHAR(128),
+    \`description\` TEXT,
+    \`price\` DECIMAL(15,2),
+    \`unit\` VARCHAR(50),
+    \`status\` ENUM('quoted','revised','approved','rejected') NOT NULL DEFAULT 'quoted',
+    \`quote_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`source_document_id\` VARCHAR(128),
+    \`confidence\` DECIMAL(4,3),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_quotes_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_quotes_project_id_idx\` (\`project_id\`)
+  )`,
 ]
 
 // Columns to add to existing tables: [table, column, definition]
@@ -224,6 +418,7 @@ const ALTER_COLUMNS: [string, string, string][] = [
   ['users', 'company_address',  'TEXT'],
   ['users', 'company_website',  'VARCHAR(500)'],
   ['users', 'company_gstin',    'VARCHAR(20)'],
+  ['users', 'studio_ingestion_key_hash', 'VARCHAR(255)'],
   ['payments', 'freelance_project_id', 'VARCHAR(128)'],
   ['files',    'freelance_project_id', 'VARCHAR(128)'],
   ['proposals', 'proposal_type', "ENUM('STANDARD','COST_BREAKUP') NOT NULL DEFAULT 'STANDARD'"],
