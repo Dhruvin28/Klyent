@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { authenticate } from '../../middleware/authenticate'
 import { requireStudioIngestionKey } from '../../middleware/studioIngestionKey'
+import { parseMultipart } from '../../lib/multipart'
 import { ingestMessage, listMessages } from '../../studio/messageService'
 
 export default async function studioMessageRoutes(app: FastifyInstance) {
@@ -24,33 +25,25 @@ export default async function studioMessageRoutes(app: FastifyInstance) {
    */
   app.post('/', { preHandler: requireStudioIngestionKey }, async (request, reply) => {
     const userId = request.studioUserId!
-    let data: Awaited<ReturnType<typeof request.file>> | null = null
+    let fields: Record<string, string> = {}
+    let media: { buffer: Buffer; fileName: string; mimeType: string } | null = null
+
     if (request.isMultipart()) {
-      try {
-        data = await request.file()
-      } catch {
-        data = null
+      const parsed = await parseMultipart(request)
+      fields = parsed.fields
+      if (parsed.file) {
+        media = { buffer: parsed.file.buffer, fileName: parsed.file.filename, mimeType: parsed.file.mimetype }
       }
+    } else {
+      fields = (request.body as Record<string, string>) ?? {}
     }
 
-    const fields = data?.fields ?? (request.body as Record<string, any>) ?? {}
-    const field = (name: string): string | undefined => {
-      const f = fields[name]
-      return f && typeof f === 'object' && 'value' in f ? f.value : f
-    }
+    const field = (name: string): string | undefined => fields[name]
 
     const groupName = field('group_name')
     const timestamp = field('timestamp')
     if (!groupName || !timestamp) {
-      if (data?.file) data.file.resume()
       return reply.code(400).send({ error: 'group_name and timestamp are required' })
-    }
-
-    let media: { buffer: Buffer; fileName: string; mimeType: string } | null = null
-    if (data?.file) {
-      const chunks: Buffer[] = []
-      for await (const chunk of data.file) chunks.push(chunk as Buffer)
-      media = { buffer: Buffer.concat(chunks), fileName: data.filename, mimeType: data.mimetype }
     }
 
     const message = await ingestMessage(userId, {

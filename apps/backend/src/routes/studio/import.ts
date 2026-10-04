@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm'
 import { db, studioWhatsappGroups } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
 import { config } from '../../config'
+import { parseMultipart } from '../../lib/multipart'
 import { parseWhatsAppExport } from '../../studio/whatsappExportParser'
 import { ingestMessage } from '../../studio/messageService'
 
@@ -44,30 +45,23 @@ export default async function studioImportRoutes(app: FastifyInstance) {
   // POST /api/studio/import/whatsapp-export — multipart: file + groupName + optional projectId
   app.post('/whatsapp-export', async (request, reply) => {
     const userId = request.user.sub
-    const data = await request.file({ limits: { fileSize: config.studioUpload.maxImportSize } })
-    if (!data) return reply.code(400).send({ error: 'No file provided' })
+    const { fields, file } = await parseMultipart(request, { fileSizeLimit: config.studioUpload.maxImportSize })
+    if (!file) return reply.code(400).send({ error: 'No file provided' })
+    if (file.truncated) {
+      return reply.code(413).send({ error: `File too large. Maximum size is ${config.studioUpload.maxImportSize / (1024 * 1024)}MB.` })
+    }
 
-    const groupNameField = data.fields['groupName'] as { value: string } | undefined
-    const projectIdField = data.fields['projectId'] as { value: string } | undefined
-    const groupName = groupNameField?.value?.trim()
-
+    const groupName = fields.groupName?.trim()
     if (!groupName) {
-      data.file.resume()
       return reply.code(400).send({ error: 'groupName is required (which project/WhatsApp group this export belongs to)' })
     }
 
-    const chunks: Buffer[] = []
-    for await (const chunk of data.file) chunks.push(chunk as Buffer)
-    if (data.file.truncated) {
-      return reply.code(413).send({ error: `File too large. Maximum size is ${config.studioUpload.maxImportSize / (1024 * 1024)}MB.` })
-    }
-    const buffer = Buffer.concat(chunks)
-
+    const buffer = file.buffer
     let chatText: string
     const media = new Map<string, Buffer>()
 
-    const lowerName = data.filename.toLowerCase()
-    if (lowerName.endsWith('.zip') || data.mimetype === 'application/zip') {
+    const lowerName = file.filename.toLowerCase()
+    if (lowerName.endsWith('.zip') || file.mimetype === 'application/zip') {
       const zip = await JSZip.loadAsync(buffer)
       let txtEntry: JSZip.JSZipObject | null = null
       for (const entry of Object.values(zip.files)) {
@@ -128,10 +122,10 @@ export default async function studioImportRoutes(app: FastifyInstance) {
 
     // If a project hint was given and the group isn't linked to one yet,
     // link it now so subsequent imports/live messages resolve automatically.
-    if (projectIdField?.value) {
+    if (fields.projectId) {
       await db
         .update(studioWhatsappGroups)
-        .set({ projectId: projectIdField.value })
+        .set({ projectId: fields.projectId })
         .where(and(eq(studioWhatsappGroups.userId, userId), eq(studioWhatsappGroups.name, groupName)))
     }
 
