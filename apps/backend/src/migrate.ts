@@ -408,6 +408,43 @@ const CREATE_STATEMENTS = [
     INDEX \`studio_quotes_user_id_idx\` (\`user_id\`),
     INDEX \`studio_quotes_project_id_idx\` (\`project_id\`)
   )`,
+
+  `CREATE TABLE IF NOT EXISTS \`ai_sessions\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`title\` VARCHAR(255) NOT NULL DEFAULT 'New chat',
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`ai_sessions_user_id_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`ai_messages\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`session_id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`role\` ENUM('user','assistant') NOT NULL,
+    \`content\` MEDIUMTEXT NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`ai_messages_session_idx\` (\`session_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`ai_attachments\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`message_id\` VARCHAR(128) NOT NULL,
+    \`session_id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`kind\` ENUM('upload','generated') NOT NULL,
+    \`name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255) NOT NULL,
+    \`size\` INT NOT NULL,
+    \`data\` LONGBLOB NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`ai_attachments_message_idx\` (\`message_id\`),
+    INDEX \`ai_attachments_session_idx\` (\`session_id\`)
+  )`,
 ]
 
 // Columns to add to existing tables: [table, column, definition]

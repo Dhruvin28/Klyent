@@ -10,7 +10,14 @@ import {
   mysqlEnum,
   index,
   uniqueIndex,
+  customType,
 } from 'drizzle-orm/mysql-core'
+
+const longblob = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return 'longblob'
+  },
+})
 
 export const users = mysqlTable(
   'users',
@@ -567,5 +574,56 @@ export const invoices = mysqlTable(
     clientIdIdx: index('invoices_client_id_idx').on(table.clientId),
     shareTokenIdx: uniqueIndex('invoices_share_token_idx').on(table.shareToken),
     numberIdx: index('invoices_number_idx').on(table.invoiceNumber),
+  })
+)
+
+// ── AI chat (ChatGPT-style assistant with file/image input and image generation) ──
+
+export const aiSessions = mysqlTable(
+  'ai_sessions',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull().default('New chat'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('ai_sessions_user_id_idx').on(table.userId),
+  })
+)
+
+export const aiMessages = mysqlTable(
+  'ai_messages',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    sessionId: varchar('session_id', { length: 128 }).notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    role: mysqlEnum('role', ['user', 'assistant']).notNull(),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionIdx: index('ai_messages_session_idx').on(table.sessionId),
+  })
+)
+
+export const aiAttachments = mysqlTable(
+  'ai_attachments',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    messageId: varchar('message_id', { length: 128 }).notNull(),
+    sessionId: varchar('session_id', { length: 128 }).notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    kind: mysqlEnum('kind', ['upload', 'generated']).notNull(),
+    name: varchar('name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }).notNull(),
+    size: int('size').notNull(),
+    data: longblob('data').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    messageIdx: index('ai_attachments_message_idx').on(table.messageId),
+    sessionIdx: index('ai_attachments_session_idx').on(table.sessionId),
   })
 )

@@ -18,6 +18,7 @@ const routeTitles: Record<string, string> = {
   '/clients': 'Clients',
   '/payments': 'Payments',
   '/files': 'Files',
+  '/ai': 'AI',
   '/profile': 'Profile',
 }
 

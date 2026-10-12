@@ -24,6 +24,7 @@ import { InvoiceSharePage } from '@/pages/InvoiceSharePage'
 import { StudioProjectsPage } from '@/pages/studio/StudioProjectsPage'
 import { StudioProjectDetailPage } from '@/pages/studio/StudioProjectDetailPage'
 import { StudioAskPage } from '@/pages/studio/StudioAskPage'
+import { AiPage } from '@/pages/AiPage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/invoices/new" element={<CreateInvoicePage />} />
           <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/ai" element={<AiPage />} />
           <Route path="/studio" element={<StudioProjectsPage />} />
           <Route path="/studio/ask" element={<StudioAskPage />} />
           <Route path="/studio/:id" element={<StudioProjectDetailPage />} />

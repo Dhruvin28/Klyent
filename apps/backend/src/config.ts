@@ -34,6 +34,11 @@ export const config = {
     chatModel: process.env.OPENAI_CHAT_MODEL ?? 'gpt-4.1-mini',
     embeddingModel: process.env.OPENAI_EMBEDDING_MODEL ?? 'text-embedding-3-small',
   },
+  // AI chat tab — only the API key comes from env; models/effort are chosen per request in the UI.
+  ai: {
+    maxFiles: 6,
+    maxFileSize: 10 * 1024 * 1024, // 10MB per attachment (stored in the DB)
+  },
   // Studio AI (WhatsApp knowledge engine) — Option A groundwork, off until configured.
   studioWhatsapp: {
     verifyToken: process.env.STUDIO_WHATSAPP_VERIFY_TOKEN ?? '',
