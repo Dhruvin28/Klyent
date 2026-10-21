@@ -30,6 +30,7 @@ Klyent is a client management SaaS platform for freelancers and small businesses
 - **Activity log** — Per-client log of payments, uploads, status changes, and comments
 - **File comments** — Threaded comments on individual files
 - **Dark mode** — Full light/dark theme support
+- **Material Visualizer** — Apply laminate, tile or paint samples to surfaces in a room render with perspective, preserved lighting and server-verified pixel integrity (see below)
 
 ## Project Structure
 
@@ -299,6 +300,32 @@ All routes except `/auth/register`, `/auth/login`, and `/files/share/:token` req
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/activity` | Yes | Activity log (filter by `clientId`) |
+
+### Material Visualizer
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET / POST | `/visualizer/projects` | Yes | List / create (multipart: `original`, lossless `reference` PNG, `thumbnail`, `name`, `clientId?`) |
+| GET / PATCH / DELETE | `/visualizer/projects/:id` | Yes | Read / save state (requires current `revision`, 409 on conflict) / delete with all assets |
+| POST | `/visualizer/projects/:id/masks` | Yes | Upload a surface or protect mask (grayscale PNG, project dimensions) |
+| GET | `/visualizer/assets/:id` | Yes | Owner-only binary asset (`?download=1` for attachment) |
+| GET / POST | `/visualizer/materials` | Yes | Material library (multipart: `data` JSON, `texture` PNG, `source` photo) |
+| PATCH / DELETE | `/visualizer/materials/:id` | Yes | Update / delete (409 while used by a project option) |
+| GET / POST | `/visualizer/projects/:id/exports` | Yes | List / create a verified export (multipart: `data`, `image` PNG, `mask` PNG) — rejected with 422 if any pixel outside the mask differs from the reference |
+| DELETE | `/visualizer/exports/:id` | Yes | Delete an export |
+
+## Material Visualizer
+
+Designers upload a room render, select surfaces (wardrobe shutters, walls, floors, panels), and apply laminate/tile samples or paint colours while everything else stays pixel-identical.
+
+- **Selection** — AI select (Segment Anything / SlimSAM running in the browser via transformers.js; the ~15MB model is fetched from huggingface.co on first use and cached), Smart select (colour region growing), Polygon and Brush, plus a global **protect** mask for handles, seams and decor. All edits are undoable.
+- **Materials** — a reusable library. Sample photos are straightened from 4 corners, de-lit (photographed light gradient removed) and made seamlessly tileable; the physical size of the sample sets true scale. Paint is stored by hex plus brand/code.
+- **Application** — each surface has a perspective quad (homography) and real width; height is estimated from perspective. Grain rotation, scale, offset, tile layout/grout, finish and lighting strength are per option.
+- **Lighting** — estimated from the render with an edge-preserving filter in log-luminance and applied to the new material. This is approximate: one image cannot reproduce true reflections, and on-screen colour depends on the sample photo and display.
+- **Options** — alternatives share surfaces/selections; compare side by side or before/after, mark one approved.
+- **Integrity** — compositing never writes a pixel whose edit alpha is 0. Every render is verified in the browser, and every export is decoded and re-verified on the server (`viz_exports.verification`); exports that fail are rejected. Exports are lossless PNG with the edit mask, a material-schedule PDF and JSON details.
+
+Rendering runs in a Web Worker on the client; renders above ~2.5MP get an instant reduced preview followed by the exact full-resolution frame. Limits: 8192px per side, 25MP. Binary assets are stored in MySQL (`viz_assets`, LONGBLOB) — **`max_allowed_packet` must be at least 64MB** (Azure Database for MySQL's default is sufficient). Engine unit tests: `npm test --workspace=apps/frontend`.
 
 ## Environment Variables Reference
 

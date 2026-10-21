@@ -25,6 +25,8 @@ import { StudioProjectsPage } from '@/pages/studio/StudioProjectsPage'
 import { StudioProjectDetailPage } from '@/pages/studio/StudioProjectDetailPage'
 import { StudioAskPage } from '@/pages/studio/StudioAskPage'
 import { AiPage } from '@/pages/AiPage'
+import { VisualizerPage } from '@/pages/visualizer/VisualizerPage'
+import { VisualizerEditorPage } from '@/pages/visualizer/VisualizerEditorPage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -62,6 +64,8 @@ export default function App() {
           <Route path="/studio" element={<StudioProjectsPage />} />
           <Route path="/studio/ask" element={<StudioAskPage />} />
           <Route path="/studio/:id" element={<StudioProjectDetailPage />} />
+          <Route path="/visualizer" element={<VisualizerPage />} />
+          <Route path="/visualizer/:id" element={<VisualizerEditorPage />} />
         </Route>
 
         {/* Catch-all redirect */}

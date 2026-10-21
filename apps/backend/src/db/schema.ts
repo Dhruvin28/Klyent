@@ -627,3 +627,99 @@ export const aiAttachments = mysqlTable(
     sessionIdx: index('ai_attachments_session_idx').on(table.sessionId),
   })
 )
+
+// ── Material Replacement Visualizer ──
+// Binary assets (renders, masks, material textures, exports) live in viz_assets so
+// project state stays a small JSON document that references them by id.
+
+export const vizAssets = mysqlTable(
+  'viz_assets',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }),
+    materialId: varchar('material_id', { length: 128 }),
+    kind: mysqlEnum('kind', ['original', 'reference', 'thumbnail', 'mask', 'material_source', 'material_texture', 'export_image', 'export_mask']).notNull(),
+    name: varchar('name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }).notNull(),
+    size: int('size').notNull(),
+    width: int('width'),
+    height: int('height'),
+    sha256: varchar('sha256', { length: 64 }).notNull(),
+    data: longblob('data').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('viz_assets_user_idx').on(table.userId),
+    projectIdx: index('viz_assets_project_idx').on(table.projectId),
+    materialIdx: index('viz_assets_material_idx').on(table.materialId),
+  })
+)
+
+export const vizProjects = mysqlTable(
+  'viz_projects',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    clientId: varchar('client_id', { length: 128 }),
+    name: varchar('name', { length: 255 }).notNull(),
+    width: int('width').notNull(),
+    height: int('height').notNull(),
+    originalAssetId: varchar('original_asset_id', { length: 128 }).notNull(),
+    referenceAssetId: varchar('reference_asset_id', { length: 128 }).notNull(),
+    thumbnailAssetId: varchar('thumbnail_asset_id', { length: 128 }),
+    state: json('state').notNull(),
+    revision: int('revision').notNull().default(1),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('viz_projects_user_idx').on(table.userId),
+  })
+)
+
+export const vizMaterials = mysqlTable(
+  'viz_materials',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    kind: mysqlEnum('kind', ['texture', 'paint']).notNull(),
+    category: varchar('category', { length: 50 }).notNull(),
+    colorHex: varchar('color_hex', { length: 7 }),
+    sourceAssetId: varchar('source_asset_id', { length: 128 }),
+    textureAssetId: varchar('texture_asset_id', { length: 128 }),
+    textureWidth: int('texture_width'),
+    textureHeight: int('texture_height'),
+    widthMm: decimal('width_mm', { precision: 10, scale: 2 }),
+    heightMm: decimal('height_mm', { precision: 10, scale: 2 }),
+    brand: varchar('brand', { length: 255 }),
+    code: varchar('code', { length: 255 }),
+    notes: text('notes'),
+    settings: json('settings'),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('viz_materials_user_idx').on(table.userId),
+  })
+)
+
+export const vizExports = mysqlTable(
+  'viz_exports',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    optionId: varchar('option_id', { length: 128 }).notNull(),
+    optionName: varchar('option_name', { length: 255 }).notNull(),
+    imageAssetId: varchar('image_asset_id', { length: 128 }).notNull(),
+    maskAssetId: varchar('mask_asset_id', { length: 128 }).notNull(),
+    details: json('details').notNull(),
+    verification: json('verification').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    projectIdx: index('viz_exports_project_idx').on(table.projectId),
+  })
+)

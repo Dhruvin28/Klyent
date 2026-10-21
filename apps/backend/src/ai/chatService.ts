@@ -4,17 +4,29 @@ import { config } from '../config'
 import { openai } from '../lib/openai'
 import { db, aiMessages, aiAttachments, aiSessions } from '../db'
 import { extractText } from '../studio/textExtract'
+import { renderPdfPages } from './pdfRender'
 
 export const SYSTEM_PROMPT = `You are the AI assistant inside Klyent, a studio/business management app. You work like ChatGPT: answer questions, analyse uploaded files, images and PDFs, write and edit text, and generate images. Use the full conversation history for context and follow-ups.
 
-YOUR MAIN JOB — realistic 3D images:
-Users usually attach a floor plan, sketch, elevation, mood-board photo, product photo or a PDF (drawings, brief, spec sheet) and want a photorealistic 3D render of it.
-- Study the attachments carefully first: layout, room proportions, furniture positions, dimensions, materials, colours, annotations and any text in the PDF/image.
-- Then call the generate_image tool. Write a rich, specific prompt: what is being shown, viewpoint/camera (e.g. eye-level interior perspective, 3/4 aerial exterior), lens, materials and finishes, colour palette, furniture and decor, time of day and lighting, atmosphere, and "photorealistic, ultra-detailed architectural visualisation, physically based materials, natural global illumination". Keep the geometry and layout faithful to the source and add nothing that contradicts it.
-- If the user attached a plan/sketch/photo/PDF and gave no instruction, assume they want a realistic 3D render of it and generate one.
-- If the user asks for a change to a previously generated image ("make the sofa blue", "different angle"), call generate_image again with reference="last_generated" and describe the full desired result.
+YOUR MAIN JOB — realistic 3D images that are EXACT to the attached 2D plans:
+Users attach floor plans, elevations, sections, sketches, product photos or PDFs (drawings, brief, spec sheet) and want a photorealistic 3D render that matches the source exactly.
+
+Step 1 — analyse before you render. Go through EVERY page of every attached PDF/image (not just the first) and extract, silently, a complete inventory:
+- overall footprint and shape, every room/zone with its label and dimensions, wall positions and thicknesses
+- every door and window: position, wall, width, swing direction; stairs, columns, level changes, ceiling heights/depth/elevation data
+- every fixture, furniture item, appliance and built-in: type, position, size, orientation
+- scale, north arrow, dimension strings, annotations, materials/finish notes, legends, title block
+Cross-check pages against each other (plan vs elevation vs section) so heights and depth are consistent.
+
+Step 2 — call generate_image with reference="uploaded". The prompt must contain that inventory in words: list every room and element with its position (e.g. "top-left", "south wall, 2 m from the corner") and dimension, the camera/viewpoint, materials, colours, lighting, and "photorealistic, ultra-detailed architectural visualisation, physically based materials, natural global illumination". Use an isometric / 3/4 aerial cutaway view for a whole floor plan, or eye-level perspective for a single room, unless the user asks otherwise.
+
+Fidelity rules (strict):
+- The 2D plan is the single source of truth. Keep layout, proportions, room count, wall positions, openings, furniture placement and dimensions EXACTLY as drawn. Do not add, remove, move, resize, rotate or mirror anything. Do not invent rooms, furniture or text that is not in the source.
+- Only things the plan leaves unspecified (finishes, lighting, textures) may be chosen by you, and must not contradict the plan.
+- If the user attached a plan/sketch/photo/PDF and gave no instruction, generate the realistic 3D render of it.
+- If the user asks for a change to a previously generated image, call generate_image with reference="last_generated" and describe the full desired result, keeping everything else unchanged.
 - Always call generate_image yourself when an image is wanted; never just output a prompt. You may call it more than once if several views are requested (max 4).
-- After the image is generated, reply briefly: what you rendered, key assumptions you made, and offer sensible next tweaks. Do not paste image links.
+- After generating, reply briefly: what you rendered, any assumptions for unspecified details, and anything in the plan that was unclear or unreadable. Do not paste image links.
 
 For everything else (questions, summaries, extracting data, writing, calculations) answer directly, accurately and concisely, using Markdown when it helps. If an attached file is unreadable or information is missing, say so plainly instead of guessing.`
 
@@ -32,7 +44,7 @@ const IMAGE_TOOL: any = {
         type: 'string',
         enum: ['uploaded', 'last_generated', 'none'],
         description:
-          'Which images to use as visual reference: "uploaded" = images the user attached (use for rendering from a plan/sketch/photo), "last_generated" = the most recent image generated in this chat (use for edits/variations), "none" = generate from the prompt alone.',
+          'Which images to use as visual reference: "uploaded" = everything the user attached, including every page of attached PDFs (use for rendering from a plan/sketch/photo/PDF), "last_generated" = the most recent image generated in this chat (use for edits/variations), "none" = generate from the prompt alone.',
       },
       size: {
         type: 'string',
@@ -200,6 +212,29 @@ interface GeneratedImage {
   mimeType: string
 }
 
+const FIDELITY_PREFIX = `The attached image(s) are the user's 2D architectural plan / drawing pages. Produce a photorealistic 3D rendering of EXACTLY this plan.
+STRICT: keep the layout, room shapes and proportions, wall positions, door and window positions, stairs, fixtures, furniture placement, orientation and relative dimensions identical to the drawing. Do not add, remove, move, resize, mirror or rotate anything. Do not invent rooms or objects. Preserve every labelled element. Real-world materials, realistic lighting and depth are applied ON TOP of the unchanged geometry.
+Details extracted from the plan:
+`
+
+const MAX_REF_IMAGES = 10
+
+async function loadReferenceImages(uploaded: AttachmentRow[]): Promise<{ buffer: Buffer; mimeType: string }[]> {
+  const out: { buffer: Buffer; mimeType: string }[] = []
+  for (const a of uploaded) {
+    if (isImageMime(a.mimeType)) {
+      out.push({ buffer: a.data, mimeType: a.mimeType })
+    } else if (a.mimeType === 'application/pdf') {
+      try {
+        for (const png of await renderPdfPages(a.data)) out.push({ buffer: png, mimeType: 'image/png' })
+      } catch (err: any) {
+        console.error('[ai] pdf rasterise failed:', a.name, err?.message ?? err)
+      }
+    }
+  }
+  return out.slice(0, MAX_REF_IMAGES)
+}
+
 async function generateImage(
   imageModel: string,
   args: { prompt: string; reference?: string; size?: string },
@@ -208,13 +243,15 @@ async function generateImage(
   const size = (['1024x1024', '1536x1024', '1024x1536'].includes(args.size ?? '') ? args.size : 'auto') as any
   const quality = 'high' as const
 
-  let refImages: { buffer: Buffer; mimeType: string; name: string }[] = []
+  let refImages: { buffer: Buffer; mimeType: string }[] = []
+  let fromPlan = false
   if (args.reference === 'uploaded') {
-    refImages = refs.uploaded.slice(-4).map((a) => ({ buffer: a.data, mimeType: a.mimeType, name: a.name }))
+    refImages = await loadReferenceImages(refs.uploaded)
+    fromPlan = refImages.length > 0
   } else if (args.reference === 'last_generated') {
     const last = refs.generatedThisTurn.at(-1)
-    if (last) refImages = [{ buffer: last.buffer, mimeType: last.mimeType, name: 'previous.png' }]
-    else if (refs.lastGenerated) refImages = [{ buffer: refs.lastGenerated.data, mimeType: refs.lastGenerated.mimeType, name: refs.lastGenerated.name }]
+    if (last) refImages = [{ buffer: last.buffer, mimeType: last.mimeType }]
+    else if (refs.lastGenerated) refImages = [{ buffer: refs.lastGenerated.data, mimeType: refs.lastGenerated.mimeType }]
   }
 
   let b64: string | undefined
@@ -222,7 +259,20 @@ async function generateImage(
     const files = await Promise.all(
       refImages.map((r, i) => toFile(r.buffer, `ref-${i}.${mimeToExt(r.mimeType)}`, { type: isImageMime(r.mimeType) ? r.mimeType : 'image/png' }))
     )
-    const res = await openai.images.edit({ model: imageModel, image: files, prompt: args.prompt, size, quality, n: 1 } as any)
+    const prompt = fromPlan ? FIDELITY_PREFIX + args.prompt : args.prompt
+    const params: any = { model: imageModel, image: files, prompt, size, quality, n: 1, input_fidelity: 'high' }
+    let res
+    try {
+      res = await openai.images.edit(params)
+    } catch (err: any) {
+      // Not every image model supports input_fidelity; retry without it.
+      if (err?.status === 400 && /input_fidelity/i.test(err?.message ?? '')) {
+        delete params.input_fidelity
+        res = await openai.images.edit(params)
+      } else {
+        throw err
+      }
+    }
     b64 = res.data?.[0]?.b64_json
   } else {
     const res = await openai.images.generate({ model: imageModel, prompt: args.prompt, size, quality, n: 1 } as any)
@@ -267,8 +317,9 @@ export async function sendMessage(opts: { userId: string; sessionId: string; con
 
   // 2. Build context from the whole thread and run the model (with tool loop).
   const { messages, atts } = await buildHistory(sessionId)
-  const currentUploads = atts.filter((a) => a.messageId === userMsgId && isImageMime(a.mimeType))
-  const priorUploads = atts.filter((a) => a.kind === 'upload' && isImageMime(a.mimeType))
+  const isVisual = (a: AttachmentRow) => isImageMime(a.mimeType) || a.mimeType === 'application/pdf'
+  const currentUploads = atts.filter((a) => a.messageId === userMsgId && isVisual(a))
+  const priorUploads = atts.filter((a) => a.kind === 'upload' && isVisual(a))
   const refs = {
     uploaded: currentUploads.length ? currentUploads : priorUploads,
     lastGenerated: atts.filter((a) => a.kind === 'generated').at(-1) ?? null,

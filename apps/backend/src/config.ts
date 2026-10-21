@@ -46,6 +46,14 @@ export const config = {
     phoneNumberId: process.env.STUDIO_WHATSAPP_PHONE_NUMBER_ID ?? '',
     appSecret: process.env.STUDIO_WHATSAPP_APP_SECRET ?? '',
   },
+  // Material Replacement Visualizer — binary assets are stored in MySQL (LONGBLOB), so
+  // the DB's max_allowed_packet must exceed maxAssetSize (MySQL 8 default is 64MB).
+  visualizer: {
+    maxAssetSize: 40 * 1024 * 1024,
+    maxSide: 8192,
+    maxPixels: 25_000_000,
+    maxTextureSide: 4096,
+  },
   studioUpload: {
     maxSize: 50 * 1024 * 1024, // 50MB — documents/media
     maxImportSize: 200 * 1024 * 1024, // 200MB — WhatsApp export zips can be large with media

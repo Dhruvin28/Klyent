@@ -26,6 +26,8 @@ export default defineConfig({
       workbox: {
         // Online-first: precache only the app shell, never cache API calls
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // The visualizer's AI-select runtime (~27MB WASM) loads on demand only.
+        globIgnores: ['**/*.wasm', '**/sam.worker-*.js'],
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [],
       },
@@ -35,6 +37,13 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  // Visualizer workers code-split (the segmentation model runtime loads lazily).
+  worker: {
+    format: 'es',
+  },
+  optimizeDeps: {
+    exclude: ['@huggingface/transformers'],
   },
   server: {
     port: 5173,

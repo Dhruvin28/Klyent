@@ -17,6 +17,7 @@ import freelanceRoutes from './routes/freelance'
 import proposalRoutes from './routes/proposals'
 import invoiceRoutes from './routes/invoices'
 import aiRoutes from './routes/ai'
+import visualizerRoutes from './routes/visualizer'
 import studioProjectRoutes from './routes/studio/projects'
 import studioGroupRoutes from './routes/studio/groups'
 import studioMessageRoutes from './routes/studio/messages'
@@ -116,6 +117,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(invoiceRoutes, { prefix: '/api/invoices' })
 
   await app.register(aiRoutes, { prefix: '/api/ai' })
+  await app.register(visualizerRoutes, { prefix: '/api/visualizer' })
 
   // Studio AI — WhatsApp project knowledge engine
   await app.register(studioProjectRoutes, { prefix: '/api/studio/projects' })

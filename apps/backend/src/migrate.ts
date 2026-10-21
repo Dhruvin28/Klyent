@@ -445,6 +445,83 @@ const CREATE_STATEMENTS = [
     INDEX \`ai_attachments_message_idx\` (\`message_id\`),
     INDEX \`ai_attachments_session_idx\` (\`session_id\`)
   )`,
+
+  // ── Material Replacement Visualizer ──
+  `CREATE TABLE IF NOT EXISTS \`viz_assets\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`material_id\` VARCHAR(128),
+    \`kind\` ENUM('original','reference','thumbnail','mask','material_source','material_texture','export_image','export_mask') NOT NULL,
+    \`name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255) NOT NULL,
+    \`size\` INT NOT NULL,
+    \`width\` INT,
+    \`height\` INT,
+    \`sha256\` VARCHAR(64) NOT NULL,
+    \`data\` LONGBLOB NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_assets_user_idx\` (\`user_id\`),
+    INDEX \`viz_assets_project_idx\` (\`project_id\`),
+    INDEX \`viz_assets_material_idx\` (\`material_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_projects\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`name\` VARCHAR(255) NOT NULL,
+    \`width\` INT NOT NULL,
+    \`height\` INT NOT NULL,
+    \`original_asset_id\` VARCHAR(128) NOT NULL,
+    \`reference_asset_id\` VARCHAR(128) NOT NULL,
+    \`thumbnail_asset_id\` VARCHAR(128),
+    \`state\` JSON NOT NULL,
+    \`revision\` INT NOT NULL DEFAULT 1,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_projects_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_materials\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`kind\` ENUM('texture','paint') NOT NULL,
+    \`category\` VARCHAR(50) NOT NULL,
+    \`color_hex\` VARCHAR(7),
+    \`source_asset_id\` VARCHAR(128),
+    \`texture_asset_id\` VARCHAR(128),
+    \`texture_width\` INT,
+    \`texture_height\` INT,
+    \`width_mm\` DECIMAL(10,2),
+    \`height_mm\` DECIMAL(10,2),
+    \`brand\` VARCHAR(255),
+    \`code\` VARCHAR(255),
+    \`notes\` TEXT,
+    \`settings\` JSON,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_materials_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_exports\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128) NOT NULL,
+    \`option_id\` VARCHAR(128) NOT NULL,
+    \`option_name\` VARCHAR(255) NOT NULL,
+    \`image_asset_id\` VARCHAR(128) NOT NULL,
+    \`mask_asset_id\` VARCHAR(128) NOT NULL,
+    \`details\` JSON NOT NULL,
+    \`verification\` JSON NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_exports_project_idx\` (\`project_id\`)
+  )`,
 ]
 
 // Columns to add to existing tables: [table, column, definition]
