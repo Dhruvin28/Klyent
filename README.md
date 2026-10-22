@@ -31,6 +31,7 @@ Klyent is a client management SaaS platform for freelancers and small businesses
 - **File comments** — Threaded comments on individual files
 - **Dark mode** — Full light/dark theme support
 - **Material Visualizer** — Apply laminate, tile or paint samples to surfaces in a room render with perspective, preserved lighting and server-verified pixel integrity (see below)
+- **Procurement** — Vendor price lists, side-by-side quote comparison per requirement, GST purchase orders with vendor share links, delivery and payment tracking, and project margins (see below)
 
 ## Project Structure
 
@@ -331,6 +332,37 @@ Designers upload a room render, select surfaces (wardrobe shutters, walls, floor
 - **Integrity** — compositing never writes a pixel whose edit alpha is 0. Every render is verified in the browser, and every export is decoded and re-verified on the server (`viz_exports.verification`); exports that fail are rejected. Exports are lossless PNG with the edit mask, a material-schedule PDF (with quantities) and JSON details.
 
 Rendering runs in a Web Worker on the client; renders above ~2.5MP get an instant reduced preview followed by the exact full-resolution frame. Limits: 8192px per side, 25MP. Binary assets are stored in MySQL (`viz_assets`, LONGBLOB) — **`max_allowed_packet` must be at least 64MB** (Azure Database for MySQL's default is sufficient). Engine unit tests: `npm test --workspace=apps/frontend`.
+
+## Procurement
+
+What a project needs to buy is tracked from first quote to delivered goods (`/procurement`).
+
+- **Vendors** — `studio_vendors`, shared with AI Studio: vendors named in imported WhatsApp chats appear automatically; contact, GSTIN and category are added here. A vendor with purchase orders cannot be deleted.
+- **Price lists** — `vendor_products`, with every price change kept in `vendor_product_prices`. Import a vendor's list from CSV (headers such as `vendor, name, brand, sku, category, unit, price, gst, hsn, lead_time_days`; common variants like `Item Name`, `Rate`, `UOM`, `GST %` are recognised). Re-importing matches on SKU (or name + brand), re-prices and keeps details the file leaves out. `source` is `designer` / `import` today and reserves `vendor` for products vendors list themselves.
+- **Requirements & comparison** — `procurement_items` (quantity, unit, client rate, needed-by). Quotes live in `studio_quotes` so prices from the catalog, typed in, or extracted by AI from WhatsApp/documents compete side by side, ranked by landed cost (GST included) with lowest / fastest / late / expired / unit-mismatch flags and the margin at each price. Approving one quote marks the item approved.
+- **Purchase orders** — `purchase_orders`, created from approved quotes (grouped per vendor under *Ready to order*) or by hand. GST totals reuse the invoice calculator (vendor GSTIN state vs place of supply). Delivery status follows received quantities per line; payments to the vendor are entered as a running total. The share link (`/procurement/orders/share/:token`, no login) lets the vendor view, download and **accept** the order; it hides payments and the project name, and stops working once the PO is cancelled.
+- **Status** — an item's status (`open → approved → ordered → received`) is derived from its quotes and the non-cancelled POs that reference it; only `cancelled` is set by hand.
+- **Summary** — per project: approved cost against budget, margin against client rates, savings versus the highest quote on each item, and amounts payable to vendors.
+
+| Method | Path | Description |
+|---|---|---|
+| GET / POST | `/procurement/vendors` | List (with product, quote and order totals) / create |
+| PATCH / DELETE | `/procurement/vendors/:id` | Update / delete (409 while the vendor has POs) |
+| GET / POST | `/procurement/products` | Catalog search (`q`, `vendorId`, `category`) / create |
+| POST | `/procurement/products/import` | Import parsed price-list rows |
+| GET | `/procurement/products/:id/prices` | Price history |
+| GET / POST | `/procurement/items` | Requirements with a quote digest / create |
+| GET / PATCH / DELETE | `/procurement/items/:id` | Comparison detail / update / delete (409 while on a PO) |
+| POST | `/procurement/items/:id/quotes` | Add a quote (from a product, a vendor, or a new vendor name) |
+| POST | `/procurement/items/:id/approve` · `/unapprove` | Choose / clear the winning quote |
+| GET · POST | `/procurement/items/unlinked-quotes` · `/:id/link-quotes` | AI-extracted quotes not yet on a requirement / attach them |
+| PATCH / DELETE | `/procurement/items/quotes/:quoteId` | Edit / remove a quote (extracted ones are only unlinked) |
+| GET / POST | `/procurement/orders` | List with totals / create |
+| GET / PATCH / DELETE | `/procurement/orders/:id` | Read / update (incl. cancel) / delete |
+| PATCH | `/procurement/orders/:id/receive` · `/payment` | Received quantities per line / total paid to the vendor |
+| POST | `/procurement/orders/:id/share` | Vendor share link |
+| GET · POST | `/procurement/orders/share/:token` · `/acknowledge` | **Public** vendor view / accept |
+| GET | `/procurement/summary?projectId=` | Project money summary |
 
 ## Environment Variables Reference
 

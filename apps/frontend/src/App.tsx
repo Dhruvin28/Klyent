@@ -28,6 +28,11 @@ import { AiPage } from '@/pages/AiPage'
 import { VisualizerPage } from '@/pages/visualizer/VisualizerPage'
 import { VisualizerEditorPage } from '@/pages/visualizer/VisualizerEditorPage'
 import { VisualizerReviewPage } from '@/pages/visualizer/VisualizerReviewPage'
+import { ProcurementPage } from '@/pages/procurement/ProcurementPage'
+import { ProcurementItemPage } from '@/pages/procurement/ProcurementItemPage'
+import { CreatePurchaseOrderPage } from '@/pages/procurement/CreatePurchaseOrderPage'
+import { PurchaseOrderDetailPage } from '@/pages/procurement/PurchaseOrderDetailPage'
+import { PurchaseOrderSharePage } from '@/pages/procurement/PurchaseOrderSharePage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -44,6 +49,7 @@ export default function App() {
         <Route path="/proposals/share/:token" element={<ProposalSharePage />} />
         <Route path="/visualizer/review/:token" element={<VisualizerReviewPage />} />
         <Route path="/invoices/share/:token" element={<InvoiceSharePage />} />
+        <Route path="/procurement/orders/share/:token" element={<PurchaseOrderSharePage />} />
 
         {/* Protected app routes */}
         <Route element={<AppLayout />}>
@@ -61,6 +67,10 @@ export default function App() {
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/invoices/new" element={<CreateInvoicePage />} />
           <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
+          <Route path="/procurement" element={<ProcurementPage />} />
+          <Route path="/procurement/items/:id" element={<ProcurementItemPage />} />
+          <Route path="/procurement/orders/new" element={<CreatePurchaseOrderPage />} />
+          <Route path="/procurement/orders/:id" element={<PurchaseOrderDetailPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/ai" element={<AiPage />} />
           <Route path="/studio" element={<StudioProjectsPage />} />

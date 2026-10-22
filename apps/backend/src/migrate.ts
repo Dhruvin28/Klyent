@@ -543,6 +543,108 @@ const CREATE_STATEMENTS = [
     UNIQUE INDEX \`viz_shares_token_idx\` (\`token\`),
     INDEX \`viz_shares_project_idx\` (\`project_id\`)
   )`,
+
+  `CREATE TABLE IF NOT EXISTS \`vendor_products\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`vendor_id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`brand\` VARCHAR(150),
+    \`sku\` VARCHAR(100),
+    \`category\` VARCHAR(100),
+    \`unit\` VARCHAR(30) NOT NULL DEFAULT 'Nos',
+    \`price\` DECIMAL(15,2) NOT NULL,
+    \`gst_rate\` DECIMAL(5,2) NOT NULL DEFAULT 18,
+    \`hsn_code\` VARCHAR(20),
+    \`description\` TEXT,
+    \`lead_time_days\` INT,
+    \`min_order_qty\` DECIMAL(15,3),
+    \`is_active\` BOOLEAN NOT NULL DEFAULT TRUE,
+    \`source\` ENUM('designer','import','vendor') NOT NULL DEFAULT 'designer',
+    \`price_updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`vendor_products_user_id_idx\` (\`user_id\`),
+    INDEX \`vendor_products_vendor_id_idx\` (\`vendor_id\`),
+    INDEX \`vendor_products_category_idx\` (\`category\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`vendor_product_prices\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`product_id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`price\` DECIMAL(15,2) NOT NULL,
+    \`recorded_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`vendor_product_prices_product_id_idx\` (\`product_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`procurement_items\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`title\` VARCHAR(255) NOT NULL,
+    \`category\` VARCHAR(100),
+    \`specification\` TEXT,
+    \`quantity\` DECIMAL(15,3) NOT NULL DEFAULT 1,
+    \`unit\` VARCHAR(30) NOT NULL DEFAULT 'Nos',
+    \`client_rate\` DECIMAL(15,2),
+    \`needed_by\` VARCHAR(10),
+    \`status\` ENUM('open','approved','ordered','received','cancelled') NOT NULL DEFAULT 'open',
+    \`approved_quote_id\` VARCHAR(128),
+    \`notes\` TEXT,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`procurement_items_user_id_idx\` (\`user_id\`),
+    INDEX \`procurement_items_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`purchase_orders\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`po_number\` VARCHAR(100) NOT NULL,
+    \`po_date\` VARCHAR(10) NOT NULL,
+    \`expected_delivery\` VARCHAR(10),
+    \`project_id\` VARCHAR(128),
+    \`vendor_id\` VARCHAR(128) NOT NULL,
+    \`vendor_name\` VARCHAR(255) NOT NULL,
+    \`vendor_phone\` VARCHAR(50),
+    \`vendor_email\` VARCHAR(255),
+    \`vendor_address\` TEXT,
+    \`vendor_gstin\` VARCHAR(20),
+    \`delivery_address\` TEXT,
+    \`supplier_state_code\` VARCHAR(2),
+    \`supplier_state_name\` VARCHAR(100),
+    \`place_of_supply_code\` VARCHAR(2),
+    \`place_of_supply_name\` VARCHAR(100),
+    \`is_inter_state\` BOOLEAN NOT NULL DEFAULT FALSE,
+    \`line_items\` JSON,
+    \`subtotal\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`discount_total\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`taxable_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`cgst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`sgst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`igst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`total_tax\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`round_off\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`total_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`amount_in_words\` VARCHAR(500),
+    \`amount_paid\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`notes\` TEXT,
+    \`terms_and_conditions\` JSON,
+    \`status\` ENUM('DRAFT','SENT','PARTIALLY_RECEIVED','RECEIVED','CANCELLED') NOT NULL DEFAULT 'DRAFT',
+    \`share_token\` VARCHAR(128),
+    \`vendor_acknowledged_at\` TIMESTAMP NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`purchase_orders_share_token_idx\` (\`share_token\`),
+    INDEX \`purchase_orders_user_id_idx\` (\`user_id\`),
+    INDEX \`purchase_orders_vendor_id_idx\` (\`vendor_id\`),
+    INDEX \`purchase_orders_project_id_idx\` (\`project_id\`)
+  )`,
 ]
 
 // ENUM columns that gained values: [table, column, full definition, value that must exist]
@@ -568,6 +670,23 @@ const ALTER_COLUMNS: [string, string, string][] = [
   ['proposals', 'cost_breakup_items', 'JSON'],
   ['proposals', 'version', 'INT NOT NULL DEFAULT 1'],
   ['proposals', 'root_proposal_id', 'VARCHAR(128)'],
+  ['studio_vendors', 'phone',    'VARCHAR(50)'],
+  ['studio_vendors', 'email',    'VARCHAR(255)'],
+  ['studio_vendors', 'gstin',    'VARCHAR(20)'],
+  ['studio_vendors', 'address',  'TEXT'],
+  ['studio_vendors', 'category', 'VARCHAR(100)'],
+  ['studio_vendors', 'notes',    'TEXT'],
+  ['studio_quotes', 'item_id',        'VARCHAR(128)'],
+  ['studio_quotes', 'product_id',     'VARCHAR(128)'],
+  ['studio_quotes', 'gst_rate',       'DECIMAL(5,2)'],
+  ['studio_quotes', 'lead_time_days', 'INT'],
+  ['studio_quotes', 'valid_till',     'VARCHAR(10)'],
+  ['studio_quotes', 'notes',          'TEXT'],
+]
+
+// Indexes to add to existing tables: [table, index name, column list]
+const ADD_INDEXES: [string, string, string][] = [
+  ['studio_quotes', 'studio_quotes_item_id_idx', '`item_id`'],
 ]
 
 // Columns to make nullable if currently NOT NULL: [table, column, varchar-definition]
@@ -604,6 +723,18 @@ export async function runMigrations() {
     if (rows[0].cnt === 0) {
       await connection.execute(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`)
       console.log(`[migrate] Added column ${table}.${column}`)
+    }
+  }
+
+  for (const [table, name, columns] of ADD_INDEXES) {
+    const [rows] = await connection.execute(
+      `SELECT COUNT(*) AS cnt FROM information_schema.statistics
+       WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`,
+      [table, name]
+    ) as [{ cnt: number }[], unknown]
+    if (rows[0].cnt === 0) {
+      await connection.execute(`ALTER TABLE \`${table}\` ADD INDEX \`${name}\` (${columns})`)
+      console.log(`[migrate] Added index ${table}.${name}`)
     }
   }
 

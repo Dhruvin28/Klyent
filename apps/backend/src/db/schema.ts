@@ -451,6 +451,13 @@ export const studioVendors = mysqlTable(
     id: varchar('id', { length: 128 }).primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     contactInfo: text('contact_info'),
+    // Procurement details. Vendors extracted from WhatsApp start with only a name.
+    phone: varchar('phone', { length: 50 }),
+    email: varchar('email', { length: 255 }),
+    gstin: varchar('gstin', { length: 20 }),
+    address: text('address'),
+    category: varchar('category', { length: 100 }),
+    notes: text('notes'),
     userId: varchar('user_id', { length: 128 }).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
@@ -489,12 +496,179 @@ export const studioQuotes = mysqlTable(
     sourceMessageId: varchar('source_message_id', { length: 128 }),
     sourceDocumentId: varchar('source_document_id', { length: 128 }),
     confidence: decimal('confidence', { precision: 4, scale: 3 }),
+    // Procurement: the requirement this quote competes for, and the catalog
+    // product it was taken from (if any). Extracted quotes start unlinked.
+    itemId: varchar('item_id', { length: 128 }),
+    productId: varchar('product_id', { length: 128 }),
+    gstRate: decimal('gst_rate', { precision: 5, scale: 2 }),
+    leadTimeDays: int('lead_time_days'),
+    validTill: varchar('valid_till', { length: 10 }),
+    notes: text('notes'),
     userId: varchar('user_id', { length: 128 }).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({
     userIdIdx: index('studio_quotes_user_id_idx').on(table.userId),
     projectIdIdx: index('studio_quotes_project_id_idx').on(table.projectId),
+    itemIdIdx: index('studio_quotes_item_id_idx').on(table.itemId),
+  })
+)
+
+// ── Procurement ──
+// Vendors live in studio_vendors and quotes in studio_quotes, so prices the AI
+// pulls out of WhatsApp compete side by side with ones entered by hand.
+
+// A vendor's price list. Rows are owned by the designer today; `source` leaves
+// room for products listed by vendors themselves ('vendor') once they can sign in.
+export const vendorProducts = mysqlTable(
+  'vendor_products',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    vendorId: varchar('vendor_id', { length: 128 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    brand: varchar('brand', { length: 150 }),
+    sku: varchar('sku', { length: 100 }),
+    category: varchar('category', { length: 100 }),
+    unit: varchar('unit', { length: 30 }).notNull().default('Nos'),
+    price: decimal('price', { precision: 15, scale: 2 }).notNull(),
+    gstRate: decimal('gst_rate', { precision: 5, scale: 2 }).notNull().default('18'),
+    hsnCode: varchar('hsn_code', { length: 20 }),
+    description: text('description'),
+    leadTimeDays: int('lead_time_days'),
+    minOrderQty: decimal('min_order_qty', { precision: 15, scale: 3 }),
+    isActive: boolean('is_active').notNull().default(true),
+    source: mysqlEnum('source', ['designer', 'import', 'vendor']).notNull().default('designer'),
+    priceUpdatedAt: timestamp('price_updated_at').notNull().defaultNow(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('vendor_products_user_id_idx').on(table.userId),
+    vendorIdIdx: index('vendor_products_vendor_id_idx').on(table.vendorId),
+    categoryIdx: index('vendor_products_category_idx').on(table.category),
+  })
+)
+
+// Every price a product has had, so a quote can be judged against history.
+export const vendorProductPrices = mysqlTable(
+  'vendor_product_prices',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    productId: varchar('product_id', { length: 128 }).notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    price: decimal('price', { precision: 15, scale: 2 }).notNull(),
+    recordedAt: timestamp('recorded_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    productIdIdx: index('vendor_product_prices_product_id_idx').on(table.productId),
+  })
+)
+
+// Something a project needs to buy. Quotes are compared against it, one is
+// approved, and it is then ordered and received through purchase orders.
+export const procurementItems = mysqlTable(
+  'procurement_items',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }),
+    title: varchar('title', { length: 255 }).notNull(),
+    category: varchar('category', { length: 100 }),
+    specification: text('specification'),
+    quantity: decimal('quantity', { precision: 15, scale: 3 }).notNull().default('1'),
+    unit: varchar('unit', { length: 30 }).notNull().default('Nos'),
+    // What the client is charged per unit, for the margin on this item.
+    clientRate: decimal('client_rate', { precision: 15, scale: 2 }),
+    neededBy: varchar('needed_by', { length: 10 }),
+    // open → approved (a quote won) → ordered (on a PO) → received. Derived
+    // from quotes and POs except for 'cancelled', which the designer sets.
+    status: mysqlEnum('status', ['open', 'approved', 'ordered', 'received', 'cancelled']).notNull().default('open'),
+    approvedQuoteId: varchar('approved_quote_id', { length: 128 }),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('procurement_items_user_id_idx').on(table.userId),
+    projectIdIdx: index('procurement_items_project_id_idx').on(table.projectId),
+  })
+)
+
+export interface PurchaseOrderLine {
+  id: string
+  itemId?: string | null
+  productId?: string | null
+  description: string
+  hsnSac?: string | null
+  quantity: number
+  unit?: string | null
+  rate: number
+  discountPercent: number
+  taxRate: number
+  receivedQuantity: number
+}
+
+export const purchaseOrders = mysqlTable(
+  'purchase_orders',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    poNumber: varchar('po_number', { length: 100 }).notNull(),
+    poDate: varchar('po_date', { length: 10 }).notNull(),
+    expectedDelivery: varchar('expected_delivery', { length: 10 }),
+    projectId: varchar('project_id', { length: 128 }),
+
+    // Vendor details are snapshotted so editing the vendor never rewrites an issued PO.
+    vendorId: varchar('vendor_id', { length: 128 }).notNull(),
+    vendorName: varchar('vendor_name', { length: 255 }).notNull(),
+    vendorPhone: varchar('vendor_phone', { length: 50 }),
+    vendorEmail: varchar('vendor_email', { length: 255 }),
+    vendorAddress: text('vendor_address'),
+    vendorGstin: varchar('vendor_gstin', { length: 20 }),
+
+    deliveryAddress: text('delivery_address'),
+
+    // GST: the vendor is the supplier; place of supply is where goods are delivered.
+    supplierStateCode: varchar('supplier_state_code', { length: 2 }),
+    supplierStateName: varchar('supplier_state_name', { length: 100 }),
+    placeOfSupplyCode: varchar('place_of_supply_code', { length: 2 }),
+    placeOfSupplyName: varchar('place_of_supply_name', { length: 100 }),
+    isInterState: boolean('is_inter_state').notNull().default(false),
+
+    lineItems: json('line_items').$type<PurchaseOrderLine[]>(),
+
+    subtotal: decimal('subtotal', { precision: 15, scale: 2 }).notNull().default('0'),
+    discountTotal: decimal('discount_total', { precision: 15, scale: 2 }).notNull().default('0'),
+    taxableAmount: decimal('taxable_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    cgstAmount: decimal('cgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    sgstAmount: decimal('sgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    igstAmount: decimal('igst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalTax: decimal('total_tax', { precision: 15, scale: 2 }).notNull().default('0'),
+    roundOff: decimal('round_off', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    amountInWords: varchar('amount_in_words', { length: 500 }),
+
+    // Paid to the vendor so far, entered by hand like invoices.amountPaid.
+    amountPaid: decimal('amount_paid', { precision: 15, scale: 2 }).notNull().default('0'),
+
+    notes: text('notes'),
+    termsAndConditions: json('terms_and_conditions').$type<string[]>(),
+
+    // Delivery status. Follows the received quantities except DRAFT and CANCELLED.
+    status: mysqlEnum('status', ['DRAFT', 'SENT', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'])
+      .notNull()
+      .default('DRAFT'),
+    shareToken: varchar('share_token', { length: 128 }).unique(),
+    vendorAcknowledgedAt: timestamp('vendor_acknowledged_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('purchase_orders_user_id_idx').on(table.userId),
+    vendorIdIdx: index('purchase_orders_vendor_id_idx').on(table.vendorId),
+    projectIdIdx: index('purchase_orders_project_id_idx').on(table.projectId),
+    shareTokenIdx: uniqueIndex('purchase_orders_share_token_idx').on(table.shareToken),
   })
 )
 

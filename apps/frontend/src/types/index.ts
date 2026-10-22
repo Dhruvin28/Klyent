@@ -479,3 +479,211 @@ export interface BusinessReport {
   paymentMethods: { method: string; count: number; total: number }[]
   monthlyRevenue: { month: number; year: number; total: number }[]
 }
+
+// ---------------------------------------------------------------------
+// Procurement — vendors, price lists, quote comparison, purchase orders
+// ---------------------------------------------------------------------
+
+export interface Vendor {
+  id: string
+  name: string
+  contactInfo?: string | null
+  phone?: string | null
+  email?: string | null
+  gstin?: string | null
+  address?: string | null
+  category?: string | null
+  notes?: string | null
+  createdAt: string
+  productCount: number
+  quoteCount: number
+  orderCount: number
+  totalOrdered: number
+  totalPaid: number
+  balanceDue: number
+}
+
+export type VendorProductSource = 'designer' | 'import' | 'vendor'
+
+export interface VendorProduct {
+  id: string
+  vendorId: string
+  vendorName: string
+  vendorPhone?: string | null
+  name: string
+  brand?: string | null
+  sku?: string | null
+  category?: string | null
+  unit: string
+  price: number
+  gstRate: number
+  hsnCode?: string | null
+  description?: string | null
+  leadTimeDays?: number | null
+  minOrderQty?: number | null
+  isActive: boolean
+  source: VendorProductSource
+  priceUpdatedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VendorProductPrice {
+  price: number
+  recordedAt: string
+}
+
+export type ProcurementItemStatus = 'open' | 'approved' | 'ordered' | 'received' | 'cancelled'
+export type ProcurementQuoteSource = 'whatsapp' | 'document' | 'catalog' | 'manual'
+
+export interface ProcurementQuote {
+  id: string
+  itemId?: string | null
+  projectId?: string | null
+  vendorId?: string | null
+  vendorName?: string | null
+  vendorPhone?: string | null
+  vendorGstin?: string | null
+  productId?: string | null
+  productName?: string | null
+  productBrand?: string | null
+  materialName?: string | null
+  description?: string | null
+  price: number | null
+  unit?: string | null
+  gstRate: number | null
+  leadTimeDays?: number | null
+  validTill?: string | null
+  notes?: string | null
+  status: 'quoted' | 'revised' | 'approved' | 'rejected'
+  quoteDate?: string | null
+  confidence: number | null
+  source: ProcurementQuoteSource
+  createdAt: string
+}
+
+export interface ProcurementItem {
+  id: string
+  projectId?: string | null
+  projectName?: string | null
+  title: string
+  category?: string | null
+  specification?: string | null
+  quantity: number
+  unit: string
+  clientRate: number | null
+  neededBy?: string | null
+  status: ProcurementItemStatus
+  approvedQuoteId?: string | null
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+  // list view
+  quoteCount?: number
+  lowestPrice?: number | null
+  lowestVendorName?: string | null
+  highestPrice?: number | null
+  approvedQuote?: ProcurementQuote | null
+}
+
+export interface ProcurementItemOrderRef {
+  id: string
+  poNumber: string
+  status: PurchaseOrderStatus
+  vendorName: string
+  quantity: number
+  receivedQuantity: number
+}
+
+export interface ProcurementItemDetail extends ProcurementItem {
+  quotes: ProcurementQuote[]
+  orders: ProcurementItemOrderRef[]
+}
+
+export type PurchaseOrderStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED'
+
+export interface PurchaseOrderLine {
+  id: string
+  itemId?: string | null
+  productId?: string | null
+  description: string
+  hsnSac?: string | null
+  quantity: number
+  unit?: string | null
+  rate: number
+  discountPercent: number
+  taxRate: number
+  receivedQuantity: number
+}
+
+export interface PurchaseOrder {
+  id: string
+  poNumber: string
+  poDate: string
+  expectedDelivery?: string | null
+  projectId?: string | null
+  projectName?: string | null
+
+  vendorId: string
+  vendorName: string
+  vendorPhone?: string | null
+  vendorEmail?: string | null
+  vendorAddress?: string | null
+  vendorGstin?: string | null
+
+  deliveryAddress?: string | null
+  supplierStateCode?: string | null
+  supplierStateName?: string | null
+  placeOfSupplyCode?: string | null
+  placeOfSupplyName?: string | null
+  isInterState: boolean
+
+  lineItems?: PurchaseOrderLine[] | null
+
+  subtotal: number
+  discountTotal: number
+  taxableAmount: number
+  cgstAmount: number
+  sgstAmount: number
+  igstAmount: number
+  totalTax: number
+  roundOff: number
+  totalAmount: number
+  amountInWords?: string | null
+  // Not sent on the vendor's shared view.
+  amountPaid?: number
+  balanceDue?: number
+
+  notes?: string | null
+  termsAndConditions?: string[] | null
+  status: PurchaseOrderStatus
+  shareToken?: string | null
+  vendorAcknowledgedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  // joined from user
+  companyName?: string | null
+  companyLogoUrl?: string | null
+  companyPhone?: string | null
+  companyAddress?: string | null
+  companyWebsite?: string | null
+  companyGstin?: string | null
+}
+
+export interface PurchaseOrderSummary {
+  ordered: number
+  paid: number
+  outstanding: number
+}
+
+export interface ProcurementSummary {
+  budget: number | null
+  items: { total: number; open: number; approved: number; ordered: number; received: number }
+  approvedCost: number
+  clientValue: number
+  margin: number
+  marginPercent: number | null
+  itemsWithoutClientRate: number
+  savings: number
+  orders: { count: number; committed: number; paid: number; outstanding: number; awaitingDelivery: number }
+}

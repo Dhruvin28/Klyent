@@ -16,6 +16,7 @@ import activityRoutes from './routes/activity'
 import freelanceRoutes from './routes/freelance'
 import proposalRoutes from './routes/proposals'
 import invoiceRoutes from './routes/invoices'
+import procurementRoutes from './routes/procurement'
 import aiRoutes from './routes/ai'
 import visualizerRoutes from './routes/visualizer'
 import visualizerPublicRoutes from './routes/visualizer/public'
@@ -116,6 +117,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(freelanceRoutes, { prefix: '/api/freelance' })
   await app.register(proposalRoutes, { prefix: '/api/proposals' })
   await app.register(invoiceRoutes, { prefix: '/api/invoices' })
+  await app.register(procurementRoutes, { prefix: '/api/procurement' })
 
   await app.register(aiRoutes, { prefix: '/api/ai' })
   await app.register(visualizerRoutes, { prefix: '/api/visualizer' })
