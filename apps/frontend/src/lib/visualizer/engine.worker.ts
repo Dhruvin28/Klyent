@@ -3,9 +3,9 @@
 // (exact, used for the final preview and export) and, for large renders, a reduced
 // "preview" engine so slider drags get feedback in a fraction of the time.
 
-import { VisualizerEngine, type RenderSpec } from './engine'
+import { VisualizerEngine, type MeasureSurface, type RenderSpec, type SurfaceMeasurement } from './engine'
 import { downscaleImage, downscaleMask } from './resample'
-import type { RGBAImage, VerificationReport } from './types'
+import type { Quad, RGBAImage, VerificationReport } from './types'
 import type { SmartSelectOptions } from './mask'
 
 declare const self: DedicatedWorkerGlobalScope
@@ -20,6 +20,9 @@ export type EngineRequest =
   | { type: 'smartSelect'; id: number; seed: { x: number; y: number }; opts: SmartSelectOptions }
   | { type: 'encodeMask'; id: number; width: number; height: number; data: ArrayBuffer }
   | { type: 'decodeMask'; id: number; blob: Blob; width: number; height: number }
+  | { type: 'measure'; id: number; surfaces: MeasureSurface[] }
+  | { type: 'fitQuad'; id: number; key: string }
+  | { type: 'snapEdges'; id: number; data: ArrayBuffer }
 
 export type EngineResponse =
   | { type: 'ok'; id: number }
@@ -38,6 +41,8 @@ export type EngineResponse =
   | { type: 'exported'; id: number; image: Blob; mask: Blob; report: VerificationReport; skipped: { id: string; reason: string }[] }
   | { type: 'mask'; id: number; data: ArrayBuffer }
   | { type: 'png'; id: number; blob: Blob }
+  | { type: 'measured'; id: number; surfaces: SurfaceMeasurement[] }
+  | { type: 'quad'; id: number; quad: Quad | null }
 
 const PREVIEW_MAX_PIXELS = 2_000_000
 
@@ -51,6 +56,7 @@ function post(msg: EngineResponse, transfer: Transferable[] = []) {
 
 function scaledSpec(spec: RenderSpec, k: number): RenderSpec {
   return {
+    ...spec,
     surfaces: spec.surfaces.map((s) => ({
       ...s,
       quad: s.quad ? (s.quad.map(([x, y]) => [x * k, y * k]) as typeof s.quad) : null,
@@ -158,6 +164,22 @@ self.onmessage = async (e: MessageEvent<EngineRequest>) => {
         if (!full) throw new Error('Engine not initialised')
         const m = full.smartSelect(msg.seed, msg.opts)
         post({ type: 'mask', id: msg.id, data: m.data.buffer as ArrayBuffer }, [m.data.buffer as ArrayBuffer])
+        break
+      }
+      case 'measure': {
+        if (!full) throw new Error('Engine not initialised')
+        post({ type: 'measured', id: msg.id, surfaces: full.measure(msg.surfaces) })
+        break
+      }
+      case 'fitQuad': {
+        if (!full) throw new Error('Engine not initialised')
+        post({ type: 'quad', id: msg.id, quad: full.fitQuad(msg.key) })
+        break
+      }
+      case 'snapEdges': {
+        if (!full) throw new Error('Engine not initialised')
+        const m = full.snapToEdges(new Uint8Array(msg.data))
+        post({ type: 'mask', id: msg.id, data: m.buffer as ArrayBuffer }, [m.buffer as ArrayBuffer])
         break
       }
       case 'encodeMask': {

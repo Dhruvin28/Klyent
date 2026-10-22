@@ -1,9 +1,10 @@
+import { randomBytes } from 'node:crypto'
 import { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { and, desc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm'
 import { authenticate } from '../../middleware/authenticate'
 import { config } from '../../config'
-import { db, clients, vizAssets, vizExports, vizMaterials, vizProjects } from '../../db'
+import { db, clients, vizAssets, vizExports, vizMaterials, vizProjects, vizShares, type VizShareOption } from '../../db'
 import {
   VizImageError,
   assertWorkingSize,
@@ -16,6 +17,7 @@ import {
 } from '../../visualizer/imageCheck'
 import {
   initialState,
+  materialEstimateSchema,
   materialFieldsSchema,
   referencedMaskIds,
   referencedMaterialIds,
@@ -82,6 +84,9 @@ const MIME_EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jp
 
 // 30 surfaces + protect, with headroom for masks uploaded by saves still in flight.
 const MAX_MASKS_PER_PROJECT = 120
+// The library list endpoint returns at most this many.
+const MAX_MATERIALS_PER_USER = 1000
+const MAX_SHARE_OPTIONS = 12
 
 export default async function visualizerRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -270,6 +275,14 @@ export default async function visualizerRoutes(app: FastifyInstance) {
     if (!body.success) return reply.code(400).send({ error: 'Validation Error', message: body.error.message })
     const p = await ownedProject(userId, id)
     if (!p) return reply.code(404).send({ error: 'Project not found' })
+    // A stale tab (e.g. after the render was replaced elsewhere) gets the conflict, not a
+    // validation error about selections that no longer exist. The UPDATE below re-checks atomically.
+    if (body.data.revision !== p.revision) {
+      return reply.code(409).send({
+        error: 'Conflict',
+        message: 'This project was changed in another tab or by another session. Reload to get the latest version.',
+      })
+    }
 
     const patch: Partial<typeof vizProjects.$inferInsert> = {}
     if (body.data.name !== undefined) patch.name = body.data.name
@@ -345,6 +358,7 @@ export default async function visualizerRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     if (!(await ownedProject(userId, id))) return reply.code(404).send({ error: 'Project not found' })
     await db.delete(vizExports).where(eq(vizExports.projectId, id))
+    await db.delete(vizShares).where(eq(vizShares.projectId, id))
     await db.delete(vizAssets).where(and(eq(vizAssets.projectId, id), eq(vizAssets.userId, userId)))
     await db.delete(vizProjects).where(eq(vizProjects.id, id))
     return reply.code(204).send()
@@ -666,6 +680,260 @@ export default async function visualizerRoutes(app: FastifyInstance) {
     if (!e) return reply.code(404).send({ error: 'Export not found' })
     await db.delete(vizAssets).where(and(inArray(vizAssets.id, [e.imageAssetId, e.maskAssetId]), eq(vizAssets.userId, userId)))
     await db.delete(vizExports).where(eq(vizExports.id, id))
+    return reply.code(204).send()
+  })
+
+  // ── Bulk paint import ───────────────────────────────────────────────────
+
+  const bulkPaintSchema = z.object({
+    items: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1).max(255),
+          colorHex: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+          brand: z.string().trim().max(255).nullable().optional(),
+          code: z.string().trim().max(255).nullable().optional(),
+          estimate: materialEstimateSchema.optional(),
+        })
+      )
+      .min(1)
+      .max(500),
+  })
+
+  // POST /api/visualizer/materials/bulk — paint shades from a CSV import
+  app.post('/materials/bulk', async (request, reply) => {
+    const userId = request.user.sub
+    const body = bulkPaintSchema.safeParse(request.body)
+    if (!body.success) {
+      return reply.code(400).send({ error: 'Validation Error', message: body.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') })
+    }
+    const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(vizMaterials).where(eq(vizMaterials.userId, userId))
+    if (Number(n) + body.data.items.length > MAX_MATERIALS_PER_USER) {
+      throw httpError(409, `Your library would exceed ${MAX_MATERIALS_PER_USER} materials. Remove unused ones first.`)
+    }
+    const rows = body.data.items.map((it) => ({
+      id: crypto.randomUUID(),
+      userId,
+      name: it.name,
+      kind: 'paint' as const,
+      category: 'paint',
+      colorHex: it.colorHex.toLowerCase(),
+      brand: it.brand || null,
+      code: it.code || null,
+      settings: { defaultFinish: 'matte' as const, ...(it.estimate ? { estimate: it.estimate } : {}) },
+    }))
+    for (let i = 0; i < rows.length; i += 100) await db.insert(vizMaterials).values(rows.slice(i, i + 100))
+    return reply.code(201).send({ data: { created: rows.length } })
+  })
+
+  // ── Replace the render (keeps surfaces, selections and options) ─────────
+
+  const replaceDataSchema = z.object({
+    revision: z.number().int().min(1),
+    state: z.unknown(),
+    /** surface id (or "__protect__") → multipart field holding its rescaled mask */
+    masks: z.record(z.string().max(128), z.string().regex(/^mask_\d{1,2}$/)).refine((m) => Object.keys(m).length <= 31, 'Too many masks'),
+  })
+
+  // POST /api/visualizer/projects/:id/render — multipart: data, original, reference, thumbnail?, mask_N…
+  app.post('/projects/:id/render', async (request, reply) => {
+    const userId = request.user.sub
+    const { id } = request.params as { id: string }
+    const p = await ownedProject(userId, id)
+    if (!p) return reply.code(404).send({ error: 'Project not found' })
+    const maskFields = Array.from({ length: 31 }, (_, i) => `mask_${i}`)
+    const { fields, files } = await parseFiles(request, ['original', 'reference', 'thumbnail', ...maskFields])
+    const data = parseJsonField(fields.data, replaceDataSchema, 'data')
+    if (data.revision !== p.revision) throw httpError(409, 'This project was changed in another tab or by another session. Reload to get the latest version.')
+    if (!files.original || !files.reference) throw httpError(400, 'Both the new render and its reference PNG are required')
+    const originalMime = sniffImageMime(files.original.buffer)
+    if (!originalMime) throw httpError(415, 'The room render must be a JPG, PNG or WebP image')
+    const { width, height } = await runExclusive(() => {
+      const ref = decodePng(files.reference.buffer, 'Reference render')
+      for (let i = 3; i < ref.data.length; i += 4) {
+        if (ref.data[i] !== 255) throw new VizImageError('Reference render must be fully opaque.')
+      }
+      return { width: ref.width, height: ref.height }
+    })
+    assertWorkingSize(width, height)
+    // Same framing only: masks are re-used, so the aspect ratio must match.
+    if (Math.abs(width / height - p.width / p.height) > 0.01) {
+      throw httpError(422, `The new render is ${width}×${height}; it must have the same aspect ratio as the current ${p.width}×${p.height} render.`)
+    }
+    for (const field of Object.values(data.masks)) {
+      const f = files[field]
+      if (!f) throw httpError(400, `Missing ${field}`)
+      const d = pngDimensions(f.buffer)
+      if (d.width !== width || d.height !== height) throw new VizImageError(`Selection masks must be ${width}×${height}.`)
+      await runExclusive(() => decodePng(f.buffer, 'Mask'))
+    }
+    let thumbMime: string | null = null
+    if (files.thumbnail) {
+      thumbMime = sniffImageMime(files.thumbnail.buffer)
+      if (!thumbMime || files.thumbnail.buffer.length > 2 * 1024 * 1024) throw httpError(400, 'Invalid thumbnail')
+    }
+
+    const created: string[] = []
+    try {
+      const base = safeName(files.original.filename.replace(/\.[^.]+$/, ''), 'render')
+      const originalAssetId = await insertAsset(userId, 'original', { buffer: files.original.buffer, name: `${base}.${MIME_EXT[originalMime]}`, mimeType: originalMime }, { projectId: id })
+      created.push(originalAssetId)
+      const referenceAssetId = await insertAsset(
+        userId,
+        'reference',
+        { buffer: files.reference.buffer, name: `${base}-reference.png`, mimeType: 'image/png', width, height },
+        { projectId: id }
+      )
+      created.push(referenceAssetId)
+      const thumbnailAssetId = files.thumbnail
+        ? await insertAsset(userId, 'thumbnail', { buffer: files.thumbnail.buffer, name: `${base}-thumb`, mimeType: thumbMime! }, { projectId: id })
+        : null
+      if (thumbnailAssetId) created.push(thumbnailAssetId)
+      const maskIds: Record<string, string> = {}
+      for (const [key, field] of Object.entries(data.masks)) {
+        maskIds[key] = await insertAsset(userId, 'mask', { buffer: files[field].buffer, name: 'mask.png', mimeType: 'image/png', width, height }, { projectId: id })
+        created.push(maskIds[key])
+      }
+
+      const parsed = vizStateSchema.safeParse(data.state)
+      if (!parsed.success) throw httpError(400, parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '))
+      const state: VizState = {
+        ...parsed.data,
+        surfaces: parsed.data.surfaces.map((s) => ({ ...s, maskAssetId: maskIds[s.id] ?? null })),
+        protectMaskAssetId: maskIds.__protect__ ?? null,
+      }
+      const materialIds = [...referencedMaterialIds(state)]
+      if (materialIds.length) {
+        const found = await db.select({ id: vizMaterials.id }).from(vizMaterials).where(and(inArray(vizMaterials.id, materialIds), eq(vizMaterials.userId, userId)))
+        if (found.length !== materialIds.length) throw httpError(400, 'State references unknown materials')
+      }
+      const result = await db
+        .update(vizProjects)
+        .set({ width, height, originalAssetId, referenceAssetId, thumbnailAssetId: thumbnailAssetId ?? p.thumbnailAssetId, state, revision: sql`${vizProjects.revision} + 1` })
+        .where(and(eq(vizProjects.id, id), eq(vizProjects.userId, userId), eq(vizProjects.revision, data.revision)))
+      const affected = (result as unknown as [{ affectedRows: number }])[0]?.affectedRows ?? 0
+      if (affected === 0) throw httpError(409, 'This project was changed in another tab or by another session. Reload to get the latest version.')
+    } catch (err) {
+      if (created.length) await db.delete(vizAssets).where(and(inArray(vizAssets.id, created), eq(vizAssets.userId, userId))).catch(() => undefined)
+      throw err
+    }
+
+    // The previous render and its selections are no longer reachable (exports and share links keep their own images).
+    const stale = [p.originalAssetId, p.referenceAssetId, ...(files.thumbnail && p.thumbnailAssetId ? [p.thumbnailAssetId] : [])]
+    await db.delete(vizAssets).where(and(inArray(vizAssets.id, stale), eq(vizAssets.userId, userId)))
+    await db.delete(vizAssets).where(and(eq(vizAssets.projectId, id), eq(vizAssets.kind, 'mask'), notInArray(vizAssets.id, created)))
+    return reply.send({ data: serializeProject((await ownedProject(userId, id))!) })
+  })
+
+  // ── Client review links ─────────────────────────────────────────────────
+
+  const shareDataSchema = z.object({
+    title: z.string().trim().min(1).max(255),
+    message: z.string().trim().max(2000).optional().default(''),
+    showPrices: z.boolean().default(false),
+    expiresInDays: z.number().int().min(1).max(365).nullable().default(null),
+    options: z
+      .array(
+        z.object({
+          optionId: z.string().min(1).max(128),
+          name: z.string().trim().min(1).max(120),
+          notes: z.string().max(2000).default(''),
+          total: z.number().min(0).max(1e12).nullable().default(null),
+          areaSqft: z.number().min(0).max(1e9).nullable().default(null),
+          materials: z
+            .array(z.object({ name: z.string().max(255), brand: z.string().max(255).nullable(), code: z.string().max(255).nullable(), surfaces: z.array(z.string().max(120)).max(30) }))
+            .max(50)
+            .default([]),
+        })
+      )
+      .min(1)
+      .max(MAX_SHARE_OPTIONS),
+  })
+
+  function shareImageCheck(f: UploadedFile | undefined, label: string) {
+    if (!f) throw httpError(400, `${label} image is required`)
+    const mime = sniffImageMime(f.buffer)
+    if (!mime) throw httpError(415, `${label} must be a JPG, PNG or WebP image`)
+    if (f.buffer.length > 15 * 1024 * 1024) throw httpError(413, `${label} image is too large (max 15MB)`)
+    return mime
+  }
+
+  // POST /api/visualizer/projects/:id/shares — multipart: data, original, option_0…option_N (rendered images)
+  app.post('/projects/:id/shares', async (request, reply) => {
+    const userId = request.user.sub
+    const { id } = request.params as { id: string }
+    const p = await ownedProject(userId, id)
+    if (!p) return reply.code(404).send({ error: 'Project not found' })
+    const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(vizShares).where(and(eq(vizShares.projectId, id), sql`${vizShares.revokedAt} IS NULL`))
+    if (Number(n) >= 20) throw httpError(409, 'This project already has 20 active review links. Revoke an old one first.')
+    const optionFields = Array.from({ length: MAX_SHARE_OPTIONS }, (_, i) => `option_${i}`)
+    const { fields, files } = await parseFiles(request, ['original', ...optionFields])
+    const data = parseJsonField(fields.data, shareDataSchema, 'data')
+    const state = p.state as VizState
+    for (const o of data.options) if (!state.options.some((x) => x.id === o.optionId)) throw httpError(400, `Unknown option "${o.name}"`)
+
+    const originalMime = shareImageCheck(files.original, 'Original render')
+    const mimes = data.options.map((o, i) => shareImageCheck(files[`option_${i}`], `"${o.name}"`))
+    const created: string[] = []
+    try {
+      const originalAssetId = await insertAsset(userId, 'share_image', { buffer: files.original.buffer, name: `original.${MIME_EXT[originalMime]}`, mimeType: originalMime }, { projectId: id })
+      created.push(originalAssetId)
+      const options: VizShareOption[] = []
+      for (let i = 0; i < data.options.length; i++) {
+        const o = data.options[i]
+        const imageAssetId = await insertAsset(
+          userId,
+          'share_image',
+          { buffer: files[`option_${i}`].buffer, name: `${safeName(o.name, 'option')}.${MIME_EXT[mimes[i]]}`, mimeType: mimes[i] },
+          { projectId: id }
+        )
+        created.push(imageAssetId)
+        options.push({ optionId: o.optionId, name: o.name, notes: o.notes ?? '', total: o.total ?? null, areaSqft: o.areaSqft ?? null, materials: o.materials ?? [], imageAssetId })
+      }
+      const shareId = crypto.randomUUID()
+      await db.insert(vizShares).values({
+        id: shareId,
+        userId,
+        projectId: id,
+        token: randomBytes(24).toString('base64url'),
+        title: data.title,
+        message: data.message || null,
+        originalAssetId,
+        options,
+        showPrices: data.showPrices ?? false,
+        decision: null,
+        comments: [],
+        expiresAt: data.expiresInDays != null ? new Date(Date.now() + data.expiresInDays * 86_400_000) : null,
+      })
+      const [row] = await db.select().from(vizShares).where(eq(vizShares.id, shareId)).limit(1)
+      return reply.code(201).send({ data: row })
+    } catch (err) {
+      if (created.length) await db.delete(vizAssets).where(and(inArray(vizAssets.id, created), eq(vizAssets.userId, userId))).catch(() => undefined)
+      throw err
+    }
+  })
+
+  // GET /api/visualizer/projects/:id/shares
+  app.get('/projects/:id/shares', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    if (!(await ownedProject(request.user.sub, id))) return reply.code(404).send({ error: 'Project not found' })
+    const rows = await db
+      .select()
+      .from(vizShares)
+      .where(and(eq(vizShares.projectId, id), eq(vizShares.userId, request.user.sub)))
+      .orderBy(desc(vizShares.createdAt))
+    return reply.send({ data: rows })
+  })
+
+  // DELETE /api/visualizer/shares/:id — revokes the link and deletes its images
+  app.delete('/shares/:id', async (request, reply) => {
+    const userId = request.user.sub
+    const { id } = request.params as { id: string }
+    const [s] = await db.select().from(vizShares).where(and(eq(vizShares.id, id), eq(vizShares.userId, userId))).limit(1)
+    if (!s) return reply.code(404).send({ error: 'Review link not found' })
+    const assetIds = [s.originalAssetId, ...(s.options as VizShareOption[]).map((o) => o.imageAssetId)]
+    await db.delete(vizAssets).where(and(inArray(vizAssets.id, assetIds), eq(vizAssets.userId, userId)))
+    await db.delete(vizShares).where(eq(vizShares.id, id))
     return reply.code(204).send()
   })
 }

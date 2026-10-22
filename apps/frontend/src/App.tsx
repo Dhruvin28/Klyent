@@ -27,6 +27,7 @@ import { StudioAskPage } from '@/pages/studio/StudioAskPage'
 import { AiPage } from '@/pages/AiPage'
 import { VisualizerPage } from '@/pages/visualizer/VisualizerPage'
 import { VisualizerEditorPage } from '@/pages/visualizer/VisualizerEditorPage'
+import { VisualizerReviewPage } from '@/pages/visualizer/VisualizerReviewPage'
 import { Toaster } from '@/components/ui/toast'
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
         {/* Public share routes */}
         <Route path="/share/:token" element={<SharePage />} />
         <Route path="/proposals/share/:token" element={<ProposalSharePage />} />
+        <Route path="/visualizer/review/:token" element={<VisualizerReviewPage />} />
         <Route path="/invoices/share/:token" element={<InvoiceSharePage />} />
 
         {/* Protected app routes */}

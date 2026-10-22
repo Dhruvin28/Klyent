@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowLeft,
   Brush,
+  Calculator,
   CheckCircle2,
   Columns2,
   Download,
   Hand,
+  ImageUp,
+  Link2,
   Loader2,
   Maximize,
   MousePointerClick,
   PenTool,
+  Pipette,
   Redo2,
   ScanSearch,
   Shield,
@@ -35,6 +39,11 @@ import { MaterialPanel } from '@/components/visualizer/editor/MaterialPanel'
 import { OptionsBar } from '@/components/visualizer/editor/OptionsBar'
 import { ExportDialog } from '@/components/visualizer/editor/ExportDialog'
 import { CompareDialog } from '@/components/visualizer/editor/CompareDialog'
+import { EstimateDialog } from '@/components/visualizer/editor/EstimateDialog'
+import { ShareDialog } from '@/components/visualizer/editor/ShareDialog'
+import { ReplaceRenderDialog } from '@/components/visualizer/editor/ReplaceRenderDialog'
+import { ScenePanel } from '@/components/visualizer/editor/ScenePanel'
+import type { SamModelKey } from '@/lib/visualizer/samClient'
 import { useVizEditor } from '@/components/visualizer/editor/useVizEditor'
 
 export function VisualizerEditorPage() {
@@ -61,13 +70,24 @@ const TOOLS: { id: Tool; label: string; icon: typeof Hand; key: string; hint: st
   { id: 'polygon', label: 'Polygon', icon: PenTool, key: 'P', hint: 'Click corners; click the first point or double-click to close' },
   { id: 'brush', label: 'Brush', icon: Brush, key: 'B', hint: 'Paint to correct · Alt inverts · [ ] size' },
   { id: 'corners', label: 'Perspective', icon: Square, key: 'C', hint: 'Drag the 4 corners onto a real rectangle on this plane' },
+  { id: 'calibrate', label: 'Calibrate light', icon: Pipette, key: 'K', hint: 'Click a white wall or ceiling to measure the scene’s exposure and light colour' },
 ]
+
+const SAM_MODEL_KEY = 'viz.samModel'
+function storedSamModel(): SamModelKey {
+  try {
+    return localStorage.getItem(SAM_MODEL_KEY) === 'accurate' ? 'accurate' : 'fast'
+  } catch {
+    return 'fast'
+  }
+}
 
 const SELECTION_TOOLS: Tool[] = ['ai', 'wand', 'polygon', 'brush']
 
 function Editor({ project, materials }: { project: VizProject; materials: VizMaterial[] }) {
   const { toast } = useToast()
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const editor = useVizEditor(project, materials)
   const canvas = useRef<EditorCanvasHandle>(null)
   const [projectName, setProjectName] = useState(project.name)
@@ -80,6 +100,10 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
   const [samStatus, setSamStatus] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
+  const [estimateOpen, setEstimateOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [replaceOpen, setReplaceOpen] = useState(false)
+  const lastTool = useRef<Tool>('ai')
   const [settings, setSettings] = useState<ToolSettings>({
     brushSize: Math.max(8, Math.round(Math.max(project.width, project.height) / 120)),
     brushHardness: 0.8,
@@ -88,8 +112,35 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
     wandTolerance: 14,
     wandContiguous: true,
     wandLightness: 0.35,
+    samModel: storedSamModel(),
   })
-  const set = (patch: Partial<ToolSettings>) => setSettings((s) => ({ ...s, ...patch }))
+  const set = (patch: Partial<ToolSettings>) => {
+    if (patch.samModel) {
+      try {
+        localStorage.setItem(SAM_MODEL_KEY, patch.samModel)
+      } catch {
+        /* preference only */
+      }
+    }
+    setSettings((s) => ({ ...s, ...patch }))
+  }
+  const chooseTool = (t: Tool) => {
+    if (t !== 'calibrate') lastTool.current = t
+    setTool(t)
+  }
+  const onCalibrate = useCallback(
+    (point: [number, number], white: [number, number, number]) => {
+      const lum = 0.2126 * white[0] + 0.7152 * white[1] + 0.0722 * white[2]
+      if (lum < 0.02) {
+        toast({ title: 'That spot is too dark to calibrate from', description: 'Click a white wall or ceiling that is lit.', variant: 'destructive' })
+        return
+      }
+      editor.setState((s) => ({ ...s, calibration: { enabled: true, white, albedo: s.calibration?.albedo ?? 0.85, point } }))
+      toast({ title: 'Scene light calibrated', description: 'New materials now follow the render’s exposure and light colour.' })
+      setTool(lastTool.current)
+    },
+    [editor, toast]
+  )
 
   const activeIndex = editor.state.surfaces.findIndex((s) => s.id === activeSurfaceId)
   const activeSurface = activeIndex >= 0 ? editor.state.surfaces[activeIndex] : null
@@ -128,6 +179,11 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
         canvas.current?.closePolygon()
         return
       }
+      if (e.key === 'Tab' && tool === 'ai') {
+        e.preventDefault()
+        canvas.current?.cycleProposal(e.shiftKey ? -1 : 1)
+        return
+      }
       if (e.key === 'Escape') {
         canvas.current?.clearProposal()
         canvas.current?.cancelPolygon()
@@ -142,7 +198,7 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
       if (e.key.toLowerCase() === 'o' && !e.repeat) return setHoldOriginal(true)
       if (e.key.toLowerCase() === 'f') return canvas.current?.fit()
       const tl = TOOLS.find((x) => x.key.toLowerCase() === e.key.toLowerCase())
-      if (tl) setTool(tl.id)
+      if (tl) chooseTool(tl.id)
     }
     const onUp = (e: KeyboardEvent) => e.key.toLowerCase() === 'o' && setHoldOriginal(false)
     window.addEventListener('keydown', onKey)
@@ -186,7 +242,16 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
     <div className="-m-4 flex h-[calc(100dvh-3.5rem)] flex-col sm:-m-6 sm:h-[calc(100dvh-4rem)]">
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2">
-        <Link to="/visualizer" className="rounded-md p-1.5 hover:bg-accent" aria-label="Back to visualizations">
+        <Link
+          to="/visualizer"
+          className="rounded-md p-1.5 hover:bg-accent"
+          aria-label="Back to visualizations"
+          onClick={async (e) => {
+            // In-app navigation skips the browser's unsaved-changes prompt: save first.
+            e.preventDefault()
+            if ((await editor.save()) || window.confirm('Your latest changes could not be saved. Leave anyway?')) navigate('/visualizer')
+          }}
+        >
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <Input
@@ -198,6 +263,9 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
           aria-label="Project name"
         />
         <SaveBadge status={editor.saveStatus} error={editor.saveError} onRetry={() => void editor.save()} />
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setReplaceOpen(true)} disabled={!editor.ready} aria-label="Replace render" title="Replace the render with a new version of the same view">
+          <ImageUp className="h-4 w-4" />
+        </Button>
         <div className="mx-1 h-6 w-px bg-border" />
         <OptionsBar editor={editor} />
         <div className="ml-auto flex items-center gap-1.5">
@@ -221,6 +289,12 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
           <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setCompareOpen(true)} disabled={!editor.ready}>
             <Columns2 className="h-4 w-4" /> Compare
           </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setEstimateOpen(true)} disabled={!editor.ready} data-testid="viz-quantities">
+            <Calculator className="h-4 w-4" /> Quantities
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setShareOpen(true)} disabled={!editor.ready} data-testid="viz-share">
+            <Link2 className="h-4 w-4" /> Share
+          </Button>
           <Button size="sm" className="h-8 gap-1.5" onClick={() => setExportOpen(true)} disabled={!editor.ready} data-testid="viz-export">
             <Download className="h-4 w-4" /> Export
           </Button>
@@ -234,7 +308,7 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
             <button
               key={t.id}
               type="button"
-              onClick={() => setTool(t.id)}
+              onClick={() => chooseTool(t.id)}
               title={`${t.label} (${t.key}) — ${t.hint}`}
               aria-label={t.label}
               aria-pressed={tool === t.id}
@@ -276,6 +350,7 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
             showSelection={showSelection && effectiveView !== 'original' && SELECTION_TOOLS.includes(tool)}
             onSamStatus={setSamStatus}
             onError={onError}
+            onCalibrate={onCalibrate}
           />
           <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1">
             <span className={cn('w-fit rounded-md px-2 py-1 text-xs font-medium shadow', target === 'protect' ? 'bg-red-600 text-white' : 'bg-background/90')}>
@@ -288,7 +363,10 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
         {/* Right panel */}
         <aside className="max-h-[45vh] w-full shrink-0 space-y-5 overflow-y-auto border-t bg-background p-3 lg:max-h-none lg:w-80 lg:border-l lg:border-t-0">
           <ToolOptions tool={tool} target={target} settings={settings} set={set} showSelection={showSelection} setShowSelection={setShowSelection} />
-          <SurfacesPanel editor={editor} activeId={activeSurfaceId} onSelect={setActiveSurfaceId} onEditCorners={() => setTool('corners')} />
+          <SurfacesPanel editor={editor} activeId={activeSurfaceId} onSelect={setActiveSurfaceId} onEditCorners={() => chooseTool('corners')} />
+          <div className="border-t pt-4">
+            <ScenePanel editor={editor} picking={tool === 'calibrate'} onPick={() => chooseTool(tool === 'calibrate' ? lastTool.current : 'calibrate')} />
+          </div>
           <div className="border-t pt-4">
             <MaterialPanel editor={editor} surface={activeSurface} />
           </div>
@@ -323,6 +401,9 @@ function Editor({ project, materials }: { project: VizProject; materials: VizMat
 
       <ExportDialog open={exportOpen} onOpenChange={setExportOpen} editor={editor} project={{ ...project, name: projectName }} />
       <CompareDialog open={compareOpen} onOpenChange={setCompareOpen} editor={editor} />
+      <ReplaceRenderDialog open={replaceOpen} onOpenChange={setReplaceOpen} editor={editor} projectId={project.id} />
+      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} editor={editor} projectId={project.id} projectName={projectName} />
+      <EstimateDialog open={estimateOpen} onOpenChange={setEstimateOpen} editor={editor} projectName={projectName} clientId={project.clientId} />
     </div>
   )
 }
@@ -397,9 +478,25 @@ function ToolOptions({
         </>
       )}
       {tool === 'ai' && (
+        <>
+          <Segmented
+            value={settings.samModel}
+            onChange={(v) => set({ samModel: v })}
+            options={[
+              { value: 'fast', label: 'Fast (14MB)', title: 'SlimSAM — quick to download and run' },
+              { value: 'accurate', label: 'Accurate (106MB)', title: 'SAM ViT-B — tighter outlines on thin trims and handles; larger one-time download' },
+            ]}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Click the surface to get a suggestion; add more clicks to refine (Alt/right-click excludes). Use ◀ ▶ or Tab to switch between the part and the whole
+            (e.g. one shutter ↔ the whole wardrobe), and <span className="font-medium text-foreground">HD edges</span> to re-analyse just that area at full
+            resolution. Suggestions are snapped to the render’s edges; review handles and thin trims, then correct with Brush or Polygon.
+          </p>
+        </>
+      )}
+      {tool === 'calibrate' && (
         <p className="text-[11px] text-muted-foreground">
-          Click the surface to get a suggestion; add more clicks to refine (Alt/right-click excludes). The first use downloads the AI model (~15MB, cached).
-          Always review edges around handles and thin trims — then correct with Brush or Polygon.
+          Click a lit white wall or ceiling. Its colour and brightness set the scene’s exposure and light colour for every new material.
         </p>
       )}
       {tool === 'corners' && (

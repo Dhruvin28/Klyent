@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { Loader2, Palette, Pencil, Plus, Trash2, Upload, Wand2 } from 'lucide-react'
+import { FileSpreadsheet, Loader2, Palette, Pencil, Plus, Trash2, Upload, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useToast } from '@/components/ui/toast'
 import { MaterialSwatch, Segmented, VizAssetImage } from '@/components/visualizer/common'
 import { MaterialDialog } from '@/components/visualizer/MaterialDialog'
+import { ImportPaintsDialog } from '@/components/visualizer/ImportPaintsDialog'
 import { useDeleteVizMaterial, useDeleteVizProject, useVizMaterials, useVizProjects } from '@/hooks/useVisualizer'
 import { useClients } from '@/hooks/useClients'
 import { apiErrorMessage, visualizerApi } from '@/api/visualizer'
@@ -25,6 +26,7 @@ export function VisualizerPage() {
   const [tab, setTab] = useState<'projects' | 'materials'>('projects')
   const [newOpen, setNewOpen] = useState(false)
   const [materialOpen, setMaterialOpen] = useState<{ material: VizMaterial | null; kind: 'texture' | 'paint' } | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   return (
     <div className="space-y-6">
@@ -38,6 +40,9 @@ export function VisualizerPage() {
         <div className="flex gap-2">
           {tab === 'materials' ? (
             <>
+              <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)} data-testid="viz-import-paints">
+                <FileSpreadsheet className="h-4 w-4" /> Import colours
+              </Button>
               <Button variant="outline" className="gap-2" onClick={() => setMaterialOpen({ material: null, kind: 'paint' })}>
                 <Palette className="h-4 w-4" /> Paint colour
               </Button>
@@ -71,6 +76,7 @@ export function VisualizerPage() {
       )}
 
       <NewProjectDialog open={newOpen} onOpenChange={setNewOpen} />
+      <ImportPaintsDialog open={importOpen} onOpenChange={setImportOpen} />
       <MaterialDialog
         open={!!materialOpen}
         onOpenChange={(o) => !o && setMaterialOpen(null)}

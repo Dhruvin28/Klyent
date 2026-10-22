@@ -87,6 +87,30 @@ export function MaterialSchedulePDF({
             </View>
           ))}
         </View>
+        {details.quantities && details.quantities.lines.length > 0 && (
+          <View style={[s.table, { marginTop: 8 }]} wrap={false}>
+            <View style={[s.row, s.head]}>
+              <Text style={[s.cell, { width: '24%' }]}>Material</Text>
+              <Text style={[s.cell, { width: '26%' }]}>Surfaces</Text>
+              <Text style={[s.cell, { width: '10%' }]}>Area</Text>
+              <Text style={[s.cell, { width: '28%' }]}>Order quantity</Text>
+              <Text style={[s.cell, { width: '12%' }]}>Amount</Text>
+            </View>
+            {details.quantities.lines.map((q, i) => (
+              <View key={i} style={s.row}>
+                <Text style={[s.cell, { width: '24%' }]}>{q.material}{q.code ? ` (${q.code})` : ''}</Text>
+                <Text style={[s.cell, { width: '26%' }]}>{q.surfaces.join(', ')}</Text>
+                <Text style={[s.cell, { width: '10%' }]}>{q.areaSqft.toLocaleString('en-IN')} sq ft</Text>
+                <Text style={[s.cell, { width: '28%' }]}>{q.quantity} — {q.basis}</Text>
+                <Text style={[s.cell, { width: '12%' }]}>{q.amount != null ? `Rs. ${q.amount.toLocaleString('en-IN')}` : '—'}</Text>
+              </View>
+            ))}
+            <View style={[s.row, s.head, { borderBottomWidth: 0 }]}>
+              <Text style={[s.cell, { width: '88%' }]}>Estimated material cost{details.quantities.unpriced ? ` (${details.quantities.unpriced} not priced)` : ''}</Text>
+              <Text style={[s.cell, { width: '12%' }]}>Rs. {details.quantities.total.toLocaleString('en-IN')}</Text>
+            </View>
+          </View>
+        )}
         {details.notes ? <Text style={[s.foot, { color: C.text }]}>Notes: {details.notes}</Text> : null}
         <Text style={s.foot}>
           Integrity check ({verification.verifiedBy}): {verification.ok ? 'PASSED' : 'FAILED'} — {verification.protectedPixels.toLocaleString()} pixels outside the edited

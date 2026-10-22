@@ -61,6 +61,32 @@ export function downscaleMask(src: Uint8Array, w: number, h: number, outW: numbe
 }
 
 /**
+ * Resizes a selection mask to another resolution of the same view: area-average when
+ * shrinking, bilinear when enlarging (soft edges stay soft, nothing shifts).
+ */
+export function resizeMask(src: Uint8Array, w: number, h: number, outW: number, outH: number): Uint8Array {
+  if (outW === w && outH === h) return src.slice()
+  if (outW <= w && outH <= h) return downscaleMask(src, w, h, outW, outH)
+  const out = new Uint8Array(outW * outH)
+  for (let y = 0; y < outH; y++) {
+    const fy = Math.max(0, Math.min(h - 1, ((y + 0.5) * h) / outH - 0.5))
+    const y0 = Math.floor(fy)
+    const y1 = Math.min(h - 1, y0 + 1)
+    const ty = fy - y0
+    for (let x = 0; x < outW; x++) {
+      const fx = Math.max(0, Math.min(w - 1, ((x + 0.5) * w) / outW - 0.5))
+      const x0 = Math.floor(fx)
+      const x1 = Math.min(w - 1, x0 + 1)
+      const tx = fx - x0
+      const a = src[y0 * w + x0] + (src[y0 * w + x1] - src[y0 * w + x0]) * tx
+      const b = src[y1 * w + x0] + (src[y1 * w + x1] - src[y1 * w + x0]) * tx
+      out[y * outW + x] = Math.round(a + (b - a) * ty)
+    }
+  }
+  return out
+}
+
+/**
  * Bilinear upscale of a logit map followed by a threshold at 0: the boundary is
  * placed with sub-pixel accuracy at full resolution (no blocky staircase).
  */

@@ -1,15 +1,16 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Check, Loader2, Minus, Plus, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Loader2, Minus, Plus, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PROTECT_KEY } from '@/lib/visualizer/engine'
 import { applyHomography, estimateAspectRatio, isConvexQuad, planeToImage, quadFromTuples, quadToTuples } from '@/lib/visualizer/homography'
 import { applyMask, brushStroke, closeMask, fillPolygon, maskBBox, removeSmallIslands } from '@/lib/visualizer/mask'
-import { upscaleLogitsToMask } from '@/lib/visualizer/resample'
+import { SRGB_TO_LINEAR } from '@/lib/visualizer/color'
+import type { SamCandidate, SamModelKey } from '@/lib/visualizer/samClient'
 import type { Point, Quad } from '@/lib/visualizer/types'
 import type { VizEditor } from './useVizEditor'
 
-export type Tool = 'pan' | 'ai' | 'wand' | 'polygon' | 'brush' | 'corners'
+export type Tool = 'pan' | 'ai' | 'wand' | 'polygon' | 'brush' | 'corners' | 'calibrate'
 export type ViewMode = 'result' | 'original' | 'split'
 
 export interface ToolSettings {
@@ -20,6 +21,7 @@ export interface ToolSettings {
   wandTolerance: number
   wandContiguous: boolean
   wandLightness: number
+  samModel: SamModelKey
 }
 
 export interface EditorCanvasHandle {
@@ -29,6 +31,7 @@ export interface EditorCanvasHandle {
   closePolygon: () => void
   cancelPolygon: () => void
   popPolygonPoint: () => void
+  cycleProposal: (dir: 1 | -1) => void
 }
 
 interface Props {
@@ -42,6 +45,8 @@ interface Props {
   showSelection: boolean
   onSamStatus: (status: string | null) => void
   onError: (message: string) => void
+  /** Calibrate tool: mean linear RGB of the clicked patch. */
+  onCalibrate?: (point: [number, number], white: [number, number, number]) => void
 }
 
 /** Same bounds the server enforces for surface dimensions. */
@@ -53,7 +58,7 @@ const hexToRgb = (hex: string) => {
 }
 
 export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function EditorCanvas(
-  { editor, tool, target, activeSurfaceId, activeColor, settings, view, showSelection, onSamStatus, onError },
+  { editor, tool, target, activeSurfaceId, activeColor, settings, view, showSelection, onSamStatus, onError, onCalibrate },
   ref
 ) {
   const { W, H } = editor
@@ -75,6 +80,9 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
   const [samBox, setSamBox] = useState<[number, number, number, number] | null>(null)
   const [dragBox, setDragBox] = useState<[number, number, number, number] | null>(null)
   const [proposal, setProposal] = useState<Uint8Array | null>(null)
+  // AI suggestions (small → large) and which one is shown; hd = refined on a full-resolution crop.
+  const [candidates, setCandidates] = useState<{ list: SamCandidate[]; index: number; hd: boolean } | null>(null)
+  const samRun = useRef(0)
   const [busy, setBusy] = useState(false)
   const dragRef = useRef<
     | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
@@ -239,28 +247,61 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
     setSamBox(null)
     setDragBox(null)
     setProposal(null)
+    setCandidates(null)
   }, [tool, target, activeSurfaceId])
 
   // ── AI select ────────────────────────────────────────────────────────────
+  /** Shows one AI candidate, snapped to the render's edges (fixes the 1024px analysis offset). */
+  const showCandidate = useCallback(
+    async (list: SamCandidate[], index: number, hd: boolean, run: number) => {
+      setCandidates({ list, index, hd })
+      const raw = list[index].mask
+      setProposal(raw)
+      const engine = editor.engine.current
+      if (!engine) return
+      try {
+        const snapped = await engine.snapEdges(raw)
+        if (samRun.current === run) setProposal(snapped)
+      } catch {
+        /* keep the unsnapped suggestion */
+      }
+    },
+    [editor]
+  )
+
   const runSam = useCallback(
     async (points: { x: number; y: number; label: 0 | 1 }[], box: [number, number, number, number] | null) => {
       const sam = editor.sam.current
       const img = editor.original.current
       if (!sam || !img) return
+      const run = ++samRun.current
       if (!points.length && !box) {
         setProposal(null)
+        setCandidates(null)
         return
       }
       setBusy(true)
       try {
         // One SamClient per editor, so a constant key suffices; analyse() is a no-op once done.
-        await sam.analyse('render', img, (p) =>
+        await sam.analyse('render', img, settings.samModel, (p) =>
           onSamStatus(p.stage === 'download' ? `Downloading AI model${p.progress != null ? ` ${Math.round(p.progress * 100)}%` : '…'}` : 'Analysing render…')
         )
         onSamStatus('Finding surface…')
-        const r = await sam.predict(points, box)
-        setProposal(upscaleLogitsToMask(r.logits, r.width, r.height, W, H))
+        const list = await sam.predict(points, box, W, H)
+        if (run !== samRun.current) return
         onSamStatus(null)
+        if (!list.length) {
+          setProposal(null)
+          setCandidates(null)
+          onError('No surface found there — try another click or drag a box around it.')
+          return
+        }
+        // Start with the candidate the model is most confident about.
+        let best = 0
+        list.forEach((c, i) => {
+          if (c.score > list[best].score) best = i
+        })
+        await showCandidate(list, best, false, run)
       } catch (err) {
         onSamStatus(null)
         onError(`AI selection unavailable: ${err instanceof Error ? err.message : 'unknown error'}. Use Smart select or Polygon instead.`)
@@ -268,8 +309,66 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
         setBusy(false)
       }
     },
-    [editor, W, H, onSamStatus, onError]
+    [editor, W, H, onSamStatus, onError, settings.samModel, showCandidate]
   )
+
+  const cycleProposal = useCallback(
+    (dir: 1 | -1) => {
+      if (!candidates || candidates.list.length < 2) return
+      const index = (candidates.index + dir + candidates.list.length) % candidates.list.length
+      void showCandidate(candidates.list, index, candidates.hd, ++samRun.current)
+    },
+    [candidates, showCandidate]
+  )
+
+  /** Re-runs the AI on a full-resolution crop around the current suggestion. */
+  const refineHD = useCallback(async () => {
+    const sam = editor.sam.current
+    const img = editor.original.current
+    if (!sam || !img || !candidates) return
+    const current = candidates.list[candidates.index].mask
+    const b = maskBBox({ width: W, height: H, data: current })
+    if (!b) return
+    const run = ++samRun.current
+    const padX = Math.max(32, Math.round((b.x1 - b.x0) * 0.15))
+    const padY = Math.max(32, Math.round((b.y1 - b.y0) * 0.15))
+    const crop = { x0: Math.max(0, b.x0 - padX), y0: Math.max(0, b.y0 - padY), x1: Math.min(W, b.x1 + padX), y1: Math.min(H, b.y1 + padY) }
+    setBusy(true)
+    try {
+      onSamStatus('Analysing the area in detail…')
+      const pts = samPoints.length ? samPoints : [{ x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2, label: 1 as const }]
+      const list = await sam.predictCrop(img, crop, pts, samBox ?? [b.x0, b.y0, b.x1, b.y1])
+      if (run !== samRun.current) return
+      if (!list.length) throw new Error('no surface found in the detailed view')
+      // Keep the candidate that best matches the one the designer had chosen.
+      let best = 0
+      let bestIou = -1
+      list.forEach((c, i) => {
+        let inter = 0
+        let uni = 0
+        for (let y = crop.y0; y < crop.y1; y++) {
+          for (let x = crop.x0; x < crop.x1; x++) {
+            const p = y * W + x
+            const a = c.mask[p] ? 1 : 0
+            const q = current[p] ? 1 : 0
+            inter += a & q
+            uni += a | q
+          }
+        }
+        const iou = uni ? inter / uni : 0
+        if (iou > bestIou) {
+          bestIou = iou
+          best = i
+        }
+      })
+      await showCandidate(list, best, true, run)
+    } catch (err) {
+      onError(`Detailed analysis failed: ${err instanceof Error ? err.message : 'unknown error'}`)
+    } finally {
+      onSamStatus(null)
+      setBusy(false)
+    }
+  }, [editor, candidates, W, H, samPoints, samBox, onSamStatus, onError, showCandidate])
 
   // ── proposal / polygon actions ───────────────────────────────────────────
   const applyProposal = useCallback(
@@ -278,6 +377,7 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
       const prop = proposal
       editor.editMask(targetKey, (m) => applyMask(m, { width: W, height: H, data: prop }, op))
       setProposal(null)
+      setCandidates(null)
       setSamPoints([])
       setSamBox(null)
     },
@@ -298,14 +398,16 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
       applyProposal,
       clearProposal: () => {
         setProposal(null)
+        setCandidates(null)
         setSamPoints([])
         setSamBox(null)
       },
       closePolygon,
       cancelPolygon: () => setPolygon([]),
       popPolygonPoint: () => setPolygon((p) => p.slice(0, -1)),
+      cycleProposal,
     }),
-    [fit, applyProposal, closePolygon]
+    [fit, applyProposal, closePolygon, cycleProposal]
   )
 
   // ── quad for the corners tool ────────────────────────────────────────────
@@ -360,6 +462,23 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
     }
     if (e.button !== 0 && !(tool === 'ai' && e.button === 2)) return
 
+    if (tool === 'calibrate') {
+      const img = editor.original.current
+      if (!img) return
+      const c = clampPt(p)
+      // Mean linear RGB of a 9×9 patch (robust to noise and grain).
+      const acc = [0, 0, 0]
+      let n = 0
+      for (let y = Math.max(0, Math.floor(c.y) - 4); y <= Math.min(H - 1, Math.floor(c.y) + 4); y++) {
+        for (let x = Math.max(0, Math.floor(c.x) - 4); x <= Math.min(W - 1, Math.floor(c.x) + 4); x++) {
+          const i = (y * W + x) * 4
+          for (let k = 0; k < 3; k++) acc[k] += SRGB_TO_LINEAR[img.data[i + k]]
+          n++
+        }
+      }
+      onCalibrate?.([Math.round(c.x), Math.round(c.y)], acc.map((v) => Math.min(1, v / n)) as [number, number, number])
+      return
+    }
     if (tool === 'corners' && quad) {
       const radius = 14 / v.zoom
       const idx = quad.findIndex((c) => Math.hypot(c.x - p.x, c.y - p.y) < radius)
@@ -475,7 +594,7 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
   const { zoom } = view2d
   const sw = 1 / zoom // one screen pixel in image units
   const cursorClass =
-    spaceDown || tool === 'pan' ? (dragRef.current?.kind === 'pan' ? 'cursor-grabbing' : 'cursor-grab') : tool === 'corners' ? 'cursor-default' : 'cursor-crosshair'
+    spaceDown || tool === 'pan' ? (dragRef.current?.kind === 'pan' ? 'cursor-grabbing' : 'cursor-grab') : tool === 'corners' ? 'cursor-default' : tool === 'calibrate' ? 'cursor-cell' : 'cursor-crosshair'
   const showResult = view !== 'original'
 
   return (
@@ -589,7 +708,25 @@ export const EditorCanvas = forwardRef<EditorCanvasHandle, Props>(function Edito
           <Button size="sm" variant="outline" onClick={() => applyProposal('subtract')} className="gap-1">
             <Minus className="h-3.5 w-3.5" /> Subtract
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setProposal(null); setSamPoints([]); setSamBox(null) }} aria-label="Discard suggestion">
+          {candidates && candidates.list.length > 1 && (
+            <div className="flex items-center rounded-md border" title="Cycle between the AI's suggestions: part ↔ whole (Tab)">
+              <Button size="sm" variant="ghost" className="h-8 w-7 p-0" onClick={() => cycleProposal(-1)} aria-label="Smaller suggestion">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <span className="px-1 text-[11px] tabular-nums text-muted-foreground" data-testid="viz-proposal-index">
+                {candidates.index + 1}/{candidates.list.length}
+              </span>
+              <Button size="sm" variant="ghost" className="h-8 w-7 p-0" onClick={() => cycleProposal(1)} aria-label="Larger suggestion">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+          {candidates && !candidates.hd && (
+            <Button size="sm" variant="outline" onClick={() => void refineHD()} className="gap-1" disabled={busy} title="Analyse just this area at full resolution for tighter edges" data-testid="viz-proposal-hd">
+              <Sparkles className="h-3.5 w-3.5" /> HD edges
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => { setProposal(null); setCandidates(null); setSamPoints([]); setSamBox(null) }} aria-label="Discard suggestion">
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>

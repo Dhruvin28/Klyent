@@ -18,6 +18,31 @@ export interface RenderParams {
   detail: number
   exposure: number
   tile: TileSettings
+  mode?: 'replace' | 'recolor'
+  lightColor?: number
+}
+
+/** Per-panel texture placement (see panels.ts): labels over the surface bbox + an affine map per panel. */
+export interface PanelPlacement {
+  /** bbox-sized label map (same bbox as the surface). */
+  labels: Int32Array
+  /** per panel (label − 1): [aU, bU, aV, bV] — material coords become (aU·u + bU, aV·v + bV); a = ±1 mirrors. */
+  params: Float64Array
+}
+
+/** Approximate planar (screen-space) reflection of what stands above a floor. */
+export interface ReflectionInput {
+  strength: number
+  /** bbox-sized: image row where the current vertical run of the surface starts (its contact line). */
+  axis: Int16Array
+  /** Blurred copy of the original over [sx0, sx0+sw) × [sy0, sy0+sh), RGBA sRGB. */
+  source: Uint8ClampedArray
+  sx0: number
+  sy0: number
+  sw: number
+  sh: number
+  /** Distance below the contact line over which the reflection fades out (px). */
+  fadePx: number
 }
 
 export interface SurfaceRenderInput {
@@ -29,6 +54,10 @@ export interface SurfaceRenderInput {
   imageToPlane: Mat3 | null
   material: RenderMaterial
   params: RenderParams
+  panels?: PanelPlacement | null
+  reflection?: ReflectionInput | null
+  /** Linear RGB multiplier from the scene calibration (light colour × exposure level). */
+  gain?: [number, number, number] | null
 }
 
 /** Deterministic per-tile hash → [0, 1). */
@@ -55,9 +84,16 @@ export function renderSurface(original: RGBAImage, out: Uint8ClampedArray, s: Su
   const { alpha, bbox, shading: f, params: p, material } = s
 
   const ks = p.shading
-  const kd = p.detail
+  const recolor = p.mode === 'recolor' && material.kind === 'paint'
+  // Recolouring keeps all of the original's fine detail (weave, brushed metal, grain).
+  const kd = recolor ? 1 : p.detail
   const exposure = p.exposure
   const finish = p.finish
+  const lc = clamp01(p.lightColor ?? 0)
+  const gain = s.gain ?? null
+  const gR = gain ? gain[0] : 1
+  const gG = gain ? gain[1] : 1
+  const gB = gain ? gain[2] : 1
   const col = new Float32Array(3)
 
   // Lighting grids: S = lighting relative to reference, Sk = S^ks (pre-exponentiated).
@@ -68,6 +104,7 @@ export function renderSurface(original: RGBAImage, out: Uint8ClampedArray, s: Su
     Sg[c] = Math.exp(f.logS[c])
     Skg[c] = Math.exp(ks * f.logS[c])
   }
+  const tint = f.tint
   const invRef = 1 / Math.exp(f.logRef)
   const gw = f.gw
   const gh = f.gh
@@ -103,6 +140,12 @@ export function renderSurface(original: RGBAImage, out: Uint8ClampedArray, s: Su
   const hm = s.imageToPlane ?? new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1])
   const h0 = hm[0], h1 = hm[1], h2 = hm[2], h3 = hm[3], h4 = hm[4], h5 = hm[5], h6 = hm[6], h7 = hm[7], h8 = hm[8]
 
+  const bw = bbox.x1 - bbox.x0
+  const panels = tex ? s.panels ?? null : null
+  const pl = panels ? panels.labels : null
+  const pp = panels ? panels.params : null
+  const refl = s.reflection && s.reflection.strength > 0 ? s.reflection : null
+
   for (let y = bbox.y0; y < bbox.y1; y++) {
     // Shading-grid row weights
     const gyf = (y + 0.5 - bbox.y0) * gs - 0.5
@@ -111,6 +154,7 @@ export function renderSurface(original: RGBAImage, out: Uint8ClampedArray, s: Su
     const ty = Math.max(0, Math.min(1, gyf - gy0))
     const r0 = gy0 * gw
     const r1 = gy1 * gw
+    const brow = (y - bbox.y0) * bw
 
     // Homogeneous plane coordinates at (x0 + ½, y + ½) and one row below.
     const cx = bbox.x0 + 0.5
@@ -144,8 +188,16 @@ export function renderSurface(original: RGBAImage, out: Uint8ClampedArray, s: Su
         // plane mm → material mm (rotation, offset and scale are linear)
         const ea = u0 - ox
         const eb = v0 - oy
-        const ms = ea * cr + eb * sr
-        const mt = -ea * sr + eb * cr
+        let ms = ea * cr + eb * sr
+        let mt = -ea * sr + eb * cr
+        if (pl && pp) {
+          const L = pl[brow + x - bbox.x0]
+          if (L > 0) {
+            const k = (L - 1) * 4
+            ms = pp[k] * ms + pp[k + 1]
+            mt = pp[k + 2] * mt + pp[k + 3]
+          }
+        }
         // Screen-pixel footprint in material mm, for mip selection and grout AA.
         const fs = Math.max(Math.abs(du1 * cr + dv1 * sr), Math.abs(du2 * cr + dv2 * sr), 1e-9)
         const ft = Math.max(Math.abs(-du1 * sr + dv1 * cr), Math.abs(-du2 * sr + dv2 * cr), 1e-9)
@@ -211,26 +263,57 @@ export function renderSurface(original: RGBAImage, out: Uint8ClampedArray, s: Su
       const w10 = tx * (1 - ty)
       const w01 = (1 - tx) * ty
       const w11 = tx * ty
-      let light = Skg[r0 + gx0] * w00 + Skg[r0 + gx1] * w10 + Skg[r1 + gx0] * w01 + Skg[r1 + gx1] * w11
+      const c00 = r0 + gx0, c10 = r0 + gx1, c01 = r1 + gx0, c11 = r1 + gx1
+      let light = Skg[c00] * w00 + Skg[c10] * w10 + Skg[c01] * w01 + Skg[c11] * w11
       // Original luminance relative to the reference level = S × fine detail.
       const rel =
         (0.2126 * SRGB_TO_LINEAR[src[i]] + 0.7152 * SRGB_TO_LINEAR[src[i + 1]] + 0.0722 * SRGB_TO_LINEAR[src[i + 2]] + LOG_EPS) * invRef
       if (kd > 0) {
-        const S = Sg[r0 + gx0] * w00 + Sg[r0 + gx1] * w10 + Sg[r1 + gx0] * w01 + Sg[r1 + gx1] * w11
+        const S = Sg[c00] * w00 + Sg[c10] * w10 + Sg[c01] * w01 + Sg[c11] * w11
         let D = rel / S
         D = D < 0.02 ? 0.02 : D > 7 ? 7 : D
-        light *= Math.pow(D, kd)
+        light *= kd === 1 ? D : Math.pow(D, kd)
       }
       light *= exposure
       // Highlights: where the original is brighter than the reference level.
       const hl = rel > 1 ? rel - 1 : 0
       let spec = 0
-      if (finish === 'matte') light /= 1 + 0.6 * hl * ks
+      if (recolor) {
+        // highlights are already in `light` through the detail term
+      } else if (finish === 'matte') light /= 1 + 0.6 * hl * ks
       else if (finish === 'gloss') spec = 0.35 * hl * ks * exposure
 
-      const nr = linearToSrgb8(col[0] * light + spec)
-      const ng = linearToSrgb8(col[1] * light + spec)
-      const nb = linearToSrgb8(col[2] * light + spec)
+      let lr = light * gR
+      let lg = light * gG
+      let lb = light * gB
+      if (lc > 0) {
+        lr *= 1 + lc * (tint[c00 * 3] * w00 + tint[c10 * 3] * w10 + tint[c01 * 3] * w01 + tint[c11 * 3] * w11 - 1)
+        lg *= 1 + lc * (tint[c00 * 3 + 1] * w00 + tint[c10 * 3 + 1] * w10 + tint[c01 * 3 + 1] * w01 + tint[c11 * 3 + 1] * w11 - 1)
+        lb *= 1 + lc * (tint[c00 * 3 + 2] * w00 + tint[c10 * 3 + 2] * w10 + tint[c01 * 3 + 2] * w01 + tint[c11 * 3 + 2] * w11 - 1)
+      }
+      let fr = col[0] * lr + spec
+      let fg = col[1] * lg + spec
+      let fb = col[2] * lb + spec
+
+      // ── reflection of what stands above the contact line ──
+      if (refl) {
+        const ay = refl.axis[brow + x - bbox.x0]
+        const d = y - ay
+        const sy = ay - 1 - d
+        if (d >= 0 && d < refl.fadePx && sy >= refl.sy0 && !alpha[sy * w + x]) {
+          const t = 1 - d / refl.fadePx
+          const R = refl.strength * t * t
+          const si = ((sy - refl.sy0) * refl.sw + (x - refl.sx0)) * 4
+          const rs = refl.source
+          fr += (SRGB_TO_LINEAR[rs[si]] - fr) * R
+          fg += (SRGB_TO_LINEAR[rs[si + 1]] - fg) * R
+          fb += (SRGB_TO_LINEAR[rs[si + 2]] - fb) * R
+        }
+      }
+
+      const nr = linearToSrgb8(fr)
+      const ng = linearToSrgb8(fg)
+      const nb = linearToSrgb8(fb)
 
       // ── protected compositing ──
       if (a === 255) {

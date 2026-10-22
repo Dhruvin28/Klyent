@@ -34,7 +34,7 @@ export interface BBox {
 
 export type Mat3 = Float64Array // row-major 3×3
 
-export const SURFACE_TYPES = ['wardrobe', 'wall', 'floor', 'ceiling', 'panel', 'countertop', 'backsplash', 'door', 'other'] as const
+export const SURFACE_TYPES = ['wardrobe', 'cabinet', 'wall', 'floor', 'ceiling', 'panel', 'countertop', 'backsplash', 'door', 'other'] as const
 export type SurfaceType = (typeof SURFACE_TYPES)[number]
 
 export const FINISHES = ['matte', 'satin', 'gloss'] as const
@@ -45,6 +45,13 @@ export type TileLayout = (typeof TILE_LAYOUTS)[number]
 
 export const MATERIAL_CATEGORIES = ['laminate', 'veneer', 'tile', 'stone', 'wood', 'fabric', 'wallpaper', 'metal', 'paint', 'other'] as const
 export type MaterialCategory = (typeof MATERIAL_CATEGORIES)[number]
+
+export const PANEL_MODES = ['continuous', 'random', 'bookmatch'] as const
+/** How a sheet material runs across separate panels (shutters) of one surface. */
+export type PanelMode = (typeof PANEL_MODES)[number]
+
+export const ESTIMATE_UNITS = ['sheet', 'box', 'litre', 'roll', 'sqft', 'sqm'] as const
+export type EstimateUnit = (typeof ESTIMATE_UNITS)[number]
 
 export interface TileSettings {
   layout: TileLayout
@@ -67,6 +74,8 @@ export interface VizSurface {
   heightManual: boolean
   /** Edge softening of the mask in pixels. */
   feather: number
+  /** Snap the soft edge to edges in the render (guided filter, ±3px). */
+  edgeSnap?: boolean
 }
 
 export interface VizAssignment {
@@ -86,6 +95,15 @@ export interface VizAssignment {
   smoothing: number
   exposure: number
   tile: TileSettings
+  /** paint only: 'recolor' keeps the original surface's texture and only changes its colour. */
+  mode?: 'replace' | 'recolor'
+  /** textures only: grain continuity across separate panels of the surface. */
+  panelMode?: PanelMode
+  panelSeed?: number
+  /** Approximate planar reflection of the scene above (floors), 0..1. */
+  reflection?: number
+  /** How much of the render's local light colour (warm lamps, daylight) tints the new material, 0..1. */
+  lightColor?: number
 }
 
 export interface VizOption {
@@ -95,6 +113,16 @@ export interface VizOption {
   assignments: Record<string, VizAssignment>
 }
 
+/** Scene exposure / white balance measured from a neutral white surface in the render. */
+export interface SceneCalibration {
+  enabled: boolean
+  /** Mean linear RGB of the reference patch. */
+  white: [number, number, number]
+  /** Assumed reflectance of the reference surface (white paint ≈ 0.85). */
+  albedo: number
+  point: [number, number]
+}
+
 export interface VizState {
   version: 1
   surfaces: VizSurface[]
@@ -102,6 +130,7 @@ export interface VizState {
   options: VizOption[]
   activeOptionId: string
   approvedOptionId: string | null
+  calibration?: SceneCalibration | null
 }
 
 export interface MaterialPrepSettings {
@@ -111,6 +140,27 @@ export interface MaterialPrepSettings {
   /** Physical size of the cornered region before seamless trimming. */
   regionWidthMm?: number
   regionHeightMm?: number
+  /** Mean sRGB of a neutral (white/grey card) patch in the sample photo, for white balance. */
+  whiteBalance?: [number, number, number] | null
+  /** 'cut' joins the repeat along a minimum-difference seam (no ghosted grain); 'blend' cross-fades. */
+  seamlessMode?: 'blend' | 'cut'
+  /** Synthesise a larger texture (×2 per side) so big surfaces show less repetition. */
+  expand?: 1 | 2
+}
+
+/** Ordering assumptions for the quantity estimate of a material. */
+export interface MaterialEstimate {
+  unit: EstimateUnit
+  /** sheet / roll size (sheet: 2440×1220; roll: width × length). */
+  sheetWidthMm?: number
+  sheetHeightMm?: number
+  piecesPerBox?: number
+  /** paint: m² per litre per coat. */
+  coverageSqmPerLitre?: number
+  coats?: number
+  wastagePct: number
+  /** Price per unit (sheet, box, litre, roll, sq ft or m²); null = not priced. */
+  rate: number | null
 }
 
 export interface VizMaterial {
@@ -133,6 +183,7 @@ export interface VizMaterial {
     defaultPattern?: 'continuous' | 'tiles'
     tile?: TileSettings
     defaultFinish?: Finish
+    estimate?: MaterialEstimate
   } | null
   createdAt: string
   updatedAt: string

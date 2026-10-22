@@ -7,9 +7,11 @@ const id = z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/)
 const finite = (min: number, max: number) => z.number().finite().min(min).max(max)
 const point = z.tuple([finite(-1e5, 1e5), finite(-1e5, 1e5)])
 
-export const SURFACE_TYPES = ['wardrobe', 'wall', 'floor', 'ceiling', 'panel', 'countertop', 'backsplash', 'door', 'other'] as const
+export const SURFACE_TYPES = ['wardrobe', 'cabinet', 'wall', 'floor', 'ceiling', 'panel', 'countertop', 'backsplash', 'door', 'other'] as const
 export const FINISHES = ['matte', 'satin', 'gloss'] as const
 export const TILE_LAYOUTS = ['grid', 'brick50', 'brick33', 'stack90'] as const
+export const PANEL_MODES = ['continuous', 'random', 'bookmatch'] as const
+export const ESTIMATE_UNITS = ['sheet', 'box', 'litre', 'roll', 'sqft', 'sqm'] as const
 
 const surfaceSchema = z.object({
   id,
@@ -21,6 +23,7 @@ const surfaceSchema = z.object({
   heightMm: finite(1, 100_000),
   heightManual: z.boolean(),
   feather: finite(0, 20),
+  edgeSnap: z.boolean().optional(),
 })
 
 const assignmentSchema = z.object({
@@ -41,6 +44,11 @@ const assignmentSchema = z.object({
     groutColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     variation: z.boolean(),
   }),
+  mode: z.enum(['replace', 'recolor']).optional(),
+  panelMode: z.enum(PANEL_MODES).optional(),
+  panelSeed: z.number().int().min(0).max(1_000_000).optional(),
+  reflection: finite(0, 1).optional(),
+  lightColor: finite(0, 1).optional(),
 })
 
 const optionSchema = z.object({
@@ -58,6 +66,15 @@ export const vizStateSchema = z
     options: z.array(optionSchema).min(1).max(20),
     activeOptionId: id,
     approvedOptionId: id.nullable(),
+    calibration: z
+      .object({
+        enabled: z.boolean(),
+        white: z.tuple([finite(0, 1), finite(0, 1), finite(0, 1)]),
+        albedo: finite(0.05, 1),
+        point: point,
+      })
+      .nullable()
+      .optional(),
   })
   .superRefine((s, ctx) => {
     const surfaceIds = new Set(s.surfaces.map((x) => x.id))
@@ -105,6 +122,19 @@ export function referencedMaterialIds(state: VizState): Set<string> {
 
 export const MATERIAL_CATEGORIES = ['laminate', 'veneer', 'tile', 'stone', 'wood', 'fabric', 'wallpaper', 'metal', 'paint', 'other'] as const
 
+export const materialEstimateSchema = z
+  .object({
+    unit: z.enum(ESTIMATE_UNITS),
+    sheetWidthMm: finite(1, 100_000).optional(),
+    sheetHeightMm: finite(1, 100_000).optional(),
+    piecesPerBox: z.number().int().min(1).max(10_000).optional(),
+    coverageSqmPerLitre: finite(0.1, 100).optional(),
+    coats: z.number().int().min(1).max(10).optional(),
+    wastagePct: finite(0, 100),
+    rate: finite(0, 1e9).nullable(),
+  })
+  .strict()
+
 export const materialSettingsSchema = z
   .object({
     prep: z
@@ -115,6 +145,9 @@ export const materialSettingsSchema = z
         // Physical size of the cornered region before seamless trimming.
         regionWidthMm: finite(1, 100_000).optional(),
         regionHeightMm: finite(1, 100_000).optional(),
+        whiteBalance: z.tuple([finite(0, 255), finite(0, 255), finite(0, 255)]).nullable().optional(),
+        seamlessMode: z.enum(['blend', 'cut']).optional(),
+        expand: z.union([z.literal(1), z.literal(2)]).optional(),
       })
       .optional(),
     defaultPattern: z.enum(['continuous', 'tiles']).optional(),
@@ -127,6 +160,7 @@ export const materialSettingsSchema = z
       })
       .optional(),
     defaultFinish: z.enum(FINISHES).optional(),
+    estimate: materialEstimateSchema.optional(),
   })
   .strict()
 

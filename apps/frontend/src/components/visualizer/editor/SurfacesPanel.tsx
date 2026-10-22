@@ -1,29 +1,20 @@
 import { useMemo, useState } from 'react'
-import { Eraser, Expand, Lock, Shrink, Sparkle, Trash2, Unlock } from 'lucide-react'
+import { Eraser, Expand, Lock, Magnet, ScanSearch, Shrink, Sparkle, Square, Trash2, Unlock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/toast'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import { closeMask, growMask, maskArea, maskBBox } from '@/lib/visualizer/mask'
 import { estimateAspectRatio, isConvexQuad, quadFromTuples } from '@/lib/visualizer/homography'
 import { SURFACE_TYPES, type SurfaceType, type VizSurface } from '@/lib/visualizer/types'
+import { SQFT_PER_SQM } from '@/lib/visualizer/estimate'
 import { NumberField, RangeField, surfaceColor } from '../common'
+import { RoomDetectDialog } from './RoomDetectDialog'
+import { DEFAULT_SIZE, MAX_SURFACES } from './surfaceDefaults'
 import { clampMm } from './EditorCanvas'
 
-const MAX_SURFACES = 30 // server limit
 import type { VizEditor } from './useVizEditor'
-
-const DEFAULT_SIZE: Record<SurfaceType, [number, number]> = {
-  wardrobe: [2400, 2100],
-  wall: [3600, 2700],
-  floor: [4000, 3500],
-  ceiling: [4000, 3500],
-  panel: [1200, 2400],
-  countertop: [2400, 600],
-  backsplash: [2400, 600],
-  door: [900, 2100],
-  other: [1000, 1000],
-}
 
 export function SurfacesPanel({
   editor,
@@ -37,7 +28,10 @@ export function SurfacesPanel({
   onEditCorners: () => void
 }) {
   const { state, setState } = editor
+  const { toast } = useToast()
   const [confirmDelete, setConfirmDelete] = useState<VizSurface | null>(null)
+  const [detectOpen, setDetectOpen] = useState(false)
+  const [fitting, setFitting] = useState(false)
   const active = state.surfaces.find((s) => s.id === activeId) ?? null
 
   const addSurface = (type: SurfaceType) => {
@@ -55,6 +49,7 @@ export function SurfacesPanel({
       heightMm: h,
       heightManual: false,
       feather: 1,
+      edgeSnap: true,
     }
     setState((s) => ({ ...s, surfaces: [...s.surfaces, surface] }))
     editor.ensureMask(id)
@@ -97,8 +92,19 @@ export function SurfacesPanel({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Surfaces</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto h-7 gap-1 px-2 text-xs"
+          onClick={() => setDetectOpen(true)}
+          disabled={!editor.ready || state.surfaces.length >= MAX_SURFACES}
+          title="Find walls, floor, ceiling, wardrobes, cabinets, doors and countertops automatically"
+          data-testid="viz-detect-room"
+        >
+          <ScanSearch className="h-3.5 w-3.5" /> Detect
+        </Button>
         <select
           className="h-7 rounded-md border bg-background px-1.5 text-xs"
           value=""
@@ -117,7 +123,7 @@ export function SurfacesPanel({
 
       {state.surfaces.length === 0 && (
         <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-          Add a surface (e.g. Wardrobe), then select it on the render with AI select, Smart select, Polygon or Brush.
+          Click <span className="font-medium text-foreground">Detect</span> to find the room’s surfaces automatically, or add one (e.g. Wardrobe) and select it on the render with AI select, Smart select, Polygon or Brush.
         </div>
       )}
 
@@ -169,25 +175,66 @@ export function SurfacesPanel({
             ))}
           </select>
 
-          <div className="text-[11px] text-muted-foreground">
-            {stats && stats.area > 0 ? `Selected ${Math.round(stats.area).toLocaleString()} px (${stats.pct.toFixed(1)}% of render)` : 'Nothing selected yet'}
+          <div className="text-[11px] text-muted-foreground" data-testid="viz-surface-area">
+            {stats && stats.area > 0 ? (
+              <>
+                {(() => {
+                  const m = editor.areas.get(active.id)
+                  return m && m.areaSqm > 0 ? (
+                    <span className="font-medium text-foreground">
+                      {(m.areaSqm * SQFT_PER_SQM).toLocaleString('en-IN', { maximumFractionDigits: 1 })} sq ft ({m.areaSqm.toFixed(2)} m²) ·{' '}
+                    </span>
+                  ) : null
+                })()}
+                {stats.pct.toFixed(1)}% of render
+              </>
+            ) : (
+              'Nothing selected yet'
+            )}
           </div>
 
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-5 gap-1">
             <MaskOp label="Grow" icon={Expand} onClick={() => editor.editMask(active.id, (m) => m.data.set(growMask(m, 1).data))} />
             <MaskOp label="Shrink" icon={Shrink} onClick={() => editor.editMask(active.id, (m) => m.data.set(growMask(m, -1).data))} />
             <MaskOp label="Fill holes" icon={Sparkle} onClick={() => editor.editMask(active.id, (m) => m.data.set(closeMask(m, 3).data))} />
+            <MaskOp label="Snap" icon={Magnet} onClick={() => void editor.snapSelection(active.id)} title="Snap the outline to edges in the render (±3px)" />
             <MaskOp label="Clear" icon={Eraser} onClick={() => editor.editMask(active.id, (m) => m.data.fill(0))} />
           </div>
+
+          <label className="flex items-center gap-2 text-xs" title="Refines the soft edge against the render on every preview and export (stays within 3px of the selection)">
+            <input type="checkbox" checked={!!active.edgeSnap} onChange={(e) => editor.updateSurface(active.id, { edgeSnap: e.target.checked })} data-testid="viz-edge-snap" />
+            Snap soft edges to the render
+          </label>
 
           <RangeField label="Edge softness" value={active.feather} min={0} max={6} step={0.25} onChange={(v) => editor.updateSurface(active.id, { feather: v })} format={(v) => `${v}px`} hint="Blends the new material into the outline. 0.5–1.5px matches rendered anti-aliasing." />
 
           <div className="space-y-2 border-t pt-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold">Real size & perspective</span>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onEditCorners}>
-                Edit corners
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs"
+                  disabled={fitting || !stats || stats.area === 0}
+                  onClick={async () => {
+                    setFitting(true)
+                    try {
+                      const ok = await editor.fitCorners(active.id)
+                      toast(ok ? { title: 'Corners fitted to the selection', description: 'Enter the real width of this rectangle so scale and quantities are right.' } : { title: 'The selection is not four-sided — place the corners by hand', variant: 'destructive' })
+                    } finally {
+                      setFitting(false)
+                    }
+                  }}
+                  title="Fit the perspective corners to the selection's outline"
+                  data-testid="viz-autofit"
+                >
+                  <Sparkle className="h-3 w-3" /> Auto-fit
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={onEditCorners}>
+                  <Square className="h-3 w-3" /> Edit
+                </Button>
+              </div>
             </div>
             <p className="text-[11px] text-muted-foreground">
               Drag the 4 corners onto a rectangle on this plane (e.g. the wardrobe front), then enter its real width.
@@ -218,6 +265,7 @@ export function SurfacesPanel({
         </div>
       )}
 
+      <RoomDetectDialog open={detectOpen} onOpenChange={setDetectOpen} editor={editor} onCreated={(id) => onSelect(id)} />
       <ConfirmDialog
         open={!!confirmDelete}
         onOpenChange={(o) => !o && setConfirmDelete(null)}
@@ -233,9 +281,9 @@ export function SurfacesPanel({
   )
 }
 
-function MaskOp({ label, icon: Icon, onClick }: { label: string; icon: typeof Expand; onClick: () => void }) {
+function MaskOp({ label, icon: Icon, onClick, title }: { label: string; icon: typeof Expand; onClick: () => void; title?: string }) {
   return (
-    <button type="button" onClick={onClick} className="flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 text-[10px] hover:bg-accent" title={label}>
+    <button type="button" onClick={onClick} className="flex flex-col items-center gap-0.5 rounded-md border px-1 py-1.5 text-[10px] hover:bg-accent" title={title ?? label}>
       <Icon className="h-3.5 w-3.5" />
       {label}
     </button>

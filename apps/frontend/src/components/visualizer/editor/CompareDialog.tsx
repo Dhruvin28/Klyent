@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { BadgeCheck, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Segmented } from '../common'
+import { SwipeCompare } from '../SwipeCompare'
 import type { VizEditor } from './useVizEditor'
 
 async function frameToUrl(pixels: Uint8ClampedArray<ArrayBuffer>, w: number, h: number): Promise<string> {
@@ -16,9 +18,17 @@ async function frameToUrl(pixels: Uint8ClampedArray<ArrayBuffer>, w: number, h: 
   return URL.createObjectURL(await out.convertToBlob({ type: 'image/jpeg', quality: 0.9 }))
 }
 
-/** Side-by-side comparison of the original and every option (rendered at full quality). */
+/** Grid or before/after swipe of the original and every option (rendered at full quality). */
 export function CompareDialog({ open, onOpenChange, editor }: { open: boolean; onOpenChange: (o: boolean) => void; editor: VizEditor }) {
   const [items, setItems] = useState<{ id: string; name: string; url: string | null }[]>([])
+  const [mode, setMode] = useState<'grid' | 'swipe'>('grid')
+  const [left, setLeft] = useState('__original__')
+  const [right, setRight] = useState(editor.state.activeOptionId)
+  useEffect(() => {
+    if (open) setRight(editor.state.approvedOptionId ?? editor.state.activeOptionId)
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  const leftItem = items.find((x) => x.id === left)
+  const rightItem = items.find((x) => x.id === right)
 
   useEffect(() => {
     if (!open) return
@@ -66,6 +76,31 @@ export function CompareDialog({ open, onOpenChange, editor }: { open: boolean; o
           <DialogTitle>Compare options</DialogTitle>
           <DialogDescription>Every option uses the same surfaces and selections — only the materials differ.</DialogDescription>
         </DialogHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-44">
+            <Segmented value={mode} onChange={setMode} options={[{ value: 'grid', label: 'Grid' }, { value: 'swipe', label: 'Swipe' }]} />
+          </div>
+          {mode === 'swipe' && (
+            <>
+              <select className="h-8 rounded-md border bg-background px-2 text-sm" value={left} onChange={(e) => setLeft(e.target.value)} aria-label="Left image">
+                {items.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+              <span className="text-xs text-muted-foreground">vs</span>
+              <select className="h-8 rounded-md border bg-background px-2 text-sm" value={right} onChange={(e) => setRight(e.target.value)} aria-label="Right image">
+                {items.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </>
+          )}
+        </div>
+        {mode === 'swipe' ? (
+          leftItem?.url && rightItem?.url ? (
+            <SwipeCompare before={leftItem.url} after={rightItem.url} beforeLabel={leftItem.name} afterLabel={rightItem.name} />
+          ) : (
+            <div className="flex aspect-video w-full items-center justify-center rounded-md border bg-muted">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          )
+        ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {items.map((it) => (
             <figure key={it.id} className="space-y-1.5">
@@ -108,6 +143,7 @@ export function CompareDialog({ open, onOpenChange, editor }: { open: boolean; o
             </figure>
           ))}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   )

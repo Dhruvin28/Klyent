@@ -1,16 +1,22 @@
 /// <reference lib="webworker" />
-// Segment Anything (SlimSAM, quantised) running in the browser via transformers.js.
-// The image encoder runs once per render; each click/box prompt then only runs the
-// light mask decoder (~50ms), so suggestions feel instant after the first analysis.
+// Segment Anything running in the browser via transformers.js. The image encoder runs
+// once per image (or HD crop); each click/box prompt then only runs the light mask
+// decoder (~50ms), so suggestions feel instant after the first analysis.
 
 import { AutoProcessor, RawImage, SamModel, Tensor, env } from '@huggingface/transformers'
 
 declare const self: DedicatedWorkerGlobalScope
 
-export const SAM_MODEL_ID = 'Xenova/slimsam-77-uniform'
+export const SAM_MODELS = {
+  /** SlimSAM-77 (pruned, ~14MB download). */
+  fast: 'Xenova/slimsam-77-uniform',
+  /** SAM ViT-B (~106MB download): noticeably tighter outlines on thin trims and handles. */
+  accurate: 'Xenova/sam-vit-base',
+} as const
+export type SamModelKey = keyof typeof SAM_MODELS
 
 export type SamRequest =
-  | { type: 'embed'; id: number; key: string; width: number; height: number; pixels: ArrayBuffer }
+  | { type: 'embed'; id: number; key: string; model: SamModelKey; width: number; height: number; pixels: ArrayBuffer }
   | {
       type: 'decode'
       id: number
@@ -22,21 +28,26 @@ export type SamRequest =
 export type SamResponse =
   | { type: 'progress'; id: number; stage: 'download' | 'analyse'; progress: number | null }
   | { type: 'embedded'; id: number }
-  | { type: 'mask'; id: number; width: number; height: number; logits: ArrayBuffer; score: number }
+  /** All candidate masks (SAM's multimask output), logits concatenated, each width × height. */
+  | { type: 'mask'; id: number; width: number; height: number; logits: ArrayBuffer; scores: number[] }
   | { type: 'error'; id: number; message: string }
 
 env.allowLocalModels = false
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-let modelPromise: Promise<{ model: any; processor: any }> | null = null
-let current: { key: string; inputs: any; embeddings: any; width: number; height: number } | null = null
+const models = new Map<SamModelKey, Promise<{ model: any; processor: any }>>()
+// Two embeddings: the full render and the most recent HD crop, so refining edges does
+// not force the whole render to be analysed again for the next click.
+const embeddings = new Map<string, { inputs: any; embeddings: any; width: number; height: number; model: SamModelKey }>()
+const MAX_EMBEDDINGS = 2
 
-function load(id: number) {
-  if (!modelPromise) {
+function load(key: SamModelKey, id: number) {
+  let p = models.get(key)
+  if (!p) {
     const files = new Map<string, { loaded: number; total: number }>()
-    const progress_callback = (p: any) => {
-      if (p?.status === 'progress' && p.file) {
-        files.set(p.file, { loaded: p.loaded ?? 0, total: p.total ?? 0 })
+    const progress_callback = (ev: any) => {
+      if (ev?.status === 'progress' && ev.file) {
+        files.set(ev.file, { loaded: ev.loaded ?? 0, total: ev.total ?? 0 })
         let loaded = 0
         let total = 0
         for (const f of files.values()) {
@@ -46,42 +57,48 @@ function load(id: number) {
         self.postMessage({ type: 'progress', id, stage: 'download', progress: total ? loaded / total : null } satisfies SamResponse)
       }
     }
-    modelPromise = Promise.all([
-      SamModel.from_pretrained(SAM_MODEL_ID, { dtype: 'q8', progress_callback }),
-      AutoProcessor.from_pretrained(SAM_MODEL_ID, { progress_callback }),
+    p = Promise.all([
+      SamModel.from_pretrained(SAM_MODELS[key], { dtype: 'q8', progress_callback }),
+      AutoProcessor.from_pretrained(SAM_MODELS[key], { progress_callback }),
     ]).then(([model, processor]) => ({ model, processor }))
-    modelPromise.catch(() => {
-      modelPromise = null
-    })
+    p.catch(() => models.delete(key))
+    models.set(key, p)
   }
-  return modelPromise
+  return p
 }
 
 self.onmessage = async (e: MessageEvent<SamRequest>) => {
   const msg = e.data
   try {
-    const { model, processor } = await load(msg.id)
     if (msg.type === 'embed') {
-      if (current?.key === msg.key) {
+      const hit = embeddings.get(msg.key)
+      if (hit && hit.model === msg.model) {
+        // refresh LRU order
+        embeddings.delete(msg.key)
+        embeddings.set(msg.key, hit)
         self.postMessage({ type: 'embedded', id: msg.id } satisfies SamResponse)
         return
       }
+      const { model, processor } = await load(msg.model, msg.id)
       self.postMessage({ type: 'progress', id: msg.id, stage: 'analyse', progress: null } satisfies SamResponse)
       const image = new RawImage(new Uint8ClampedArray(msg.pixels), msg.width, msg.height, 4).rgb()
       const inputs = await processor(image)
-      const embeddings = await model.get_image_embeddings(inputs)
-      current = { key: msg.key, inputs, embeddings, width: msg.width, height: msg.height }
+      const emb = await model.get_image_embeddings(inputs)
+      embeddings.set(msg.key, { inputs, embeddings: emb, width: msg.width, height: msg.height, model: msg.model })
+      while (embeddings.size > MAX_EMBEDDINGS) embeddings.delete(embeddings.keys().next().value!)
       self.postMessage({ type: 'embedded', id: msg.id } satisfies SamResponse)
       return
     }
 
-    if (!current || current.key !== msg.key) throw new Error('Image has not been analysed yet')
-    const { inputs, embeddings } = current
+    const current = embeddings.get(msg.key)
+    if (!current) throw new Error('Image has not been analysed yet')
+    const { model, processor } = await load(current.model, msg.id)
+    const { inputs } = current
     const [rh, rw] = inputs.reshaped_input_sizes[0] as [number, number]
     const sx = rw / current.width
     const sy = rh / current.height
     const prompts = [...msg.points]
-    const feeds: Record<string, unknown> = { ...embeddings }
+    const feeds: Record<string, unknown> = { ...current.embeddings }
     if (msg.box) {
       const [x0, y0, x1, y1] = msg.box
       feeds.input_boxes = new Tensor('float32', Float32Array.from([x0 * sx, y0 * sy, x1 * sx, y1 * sy]), [1, 1, 4])
@@ -96,13 +113,11 @@ self.onmessage = async (e: MessageEvent<SamRequest>) => {
 
     const out = await model(feeds)
     const masks = await processor.post_process_masks(out.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes, { binarize: false })
-    const scores = out.iou_scores.data as Float32Array
-    let best = 0
-    for (let k = 1; k < scores.length; k++) if (scores[k] > scores[best]) best = k
-    const m = masks[0] // [1, 3, H, W]
-    const [, , H, W] = m.dims as number[]
-    const logits = new Float32Array((m.data as Float32Array).subarray(best * H * W, (best + 1) * H * W))
-    self.postMessage({ type: 'mask', id: msg.id, width: W, height: H, logits: logits.buffer, score: scores[best] } satisfies SamResponse, [logits.buffer])
+    const scores = Array.from(out.iou_scores.data as Float32Array)
+    const m = masks[0] // [1, K, H, W]
+    const [, K, H, W] = m.dims as number[]
+    const logits = new Float32Array((m.data as Float32Array).subarray(0, K * H * W))
+    self.postMessage({ type: 'mask', id: msg.id, width: W, height: H, logits: logits.buffer, scores: scores.slice(0, K) } satisfies SamResponse, [logits.buffer])
   } catch (err) {
     self.postMessage({ type: 'error', id: msg.id, message: err instanceof Error ? err.message : String(err) } satisfies SamResponse)
   }

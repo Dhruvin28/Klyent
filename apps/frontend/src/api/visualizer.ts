@@ -1,5 +1,5 @@
-import { api } from '@/lib/axios'
-import type { VerificationReport, VizMaterial, VizState } from '@/lib/visualizer/types'
+import { api, publicApi } from '@/lib/axios'
+import type { MaterialEstimate, VerificationReport, VizMaterial, VizState } from '@/lib/visualizer/types'
 
 export interface VizProjectSummary {
   id: string
@@ -63,6 +63,12 @@ export interface ExportDetails {
     }
     application: Record<string, string | number | boolean>
   }[]
+  /** Order quantities at export time (absent on exports made before quantities existed). */
+  quantities?: {
+    lines: { material: string; brand: string | null; code: string | null; surfaces: string[]; areaSqft: number; quantity: string; basis: string; amount: number | null }[]
+    total: number
+    unpriced: number
+  }
 }
 
 export interface MaterialInput {
@@ -76,6 +82,74 @@ export interface MaterialInput {
   code?: string | null
   notes?: string | null
   settings?: VizMaterial['settings']
+}
+
+export interface ShareOptionInput {
+  optionId: string
+  name: string
+  notes: string
+  total: number | null
+  areaSqft: number | null
+  materials: { name: string; brand: string | null; code: string | null; surfaces: string[] }[]
+}
+
+export interface VizShareComment {
+  id: string
+  optionId: string | null
+  name: string
+  message: string
+  createdAt: string
+}
+
+export interface VizShareDecision {
+  optionId: string
+  optionName: string
+  clientName: string
+  comment: string
+  decidedAt: string
+}
+
+export interface VizShare {
+  id: string
+  projectId: string
+  token: string
+  title: string
+  message: string | null
+  showPrices: boolean
+  options: (ShareOptionInput & { imageAssetId: string })[]
+  decision: VizShareDecision | null
+  comments: VizShareComment[] | null
+  expiresAt: string | null
+  revokedAt: string | null
+  createdAt: string
+}
+
+/** What a client sees on a review link. Image paths are relative to the API base URL. */
+export interface PublicShare {
+  title: string
+  message: string | null
+  projectName: string
+  designer: { name: string; logoUrl: string | null; phone: string | null; website: string | null }
+  original: string
+  options: { optionId: string; name: string; notes: string; image: string; total: number | null; areaSqft: number | null; materials: ShareOptionInput['materials'] }[]
+  showPrices: boolean
+  decision: VizShareDecision | null
+  comments: VizShareComment[]
+  createdAt: string
+  expiresAt: string | null
+}
+
+export interface PaintImportItem {
+  name: string
+  colorHex: string
+  brand?: string | null
+  code?: string | null
+  estimate?: MaterialEstimate
+}
+
+/** Absolute URL for a path returned by the public share API. */
+export function publicAssetUrl(path: string): string {
+  return `${(publicApi.defaults.baseURL ?? '/api').replace(/\/$/, '')}${path}`
 }
 
 export function apiErrorMessage(err: unknown): string {
@@ -173,4 +247,60 @@ export const visualizerApi = {
   deleteExport: async (id: string): Promise<void> => {
     await api.delete(`/visualizer/exports/${id}`)
   },
+
+  importPaints: async (items: PaintImportItem[]): Promise<number> =>
+    (await api.post<{ data: { created: number } }>('/visualizer/materials/bulk', { items })).data.data.created,
+
+  /** Swaps in a new render of the same view; masks are rescaled by the caller and re-uploaded here. */
+  replaceRender: async (
+    projectId: string,
+    input: { revision: number; state: VizState; original: File; reference: Blob; thumbnail: Blob; masks: Record<string, Blob> },
+    onProgress?: (fraction: number) => void
+  ): Promise<VizProject> => {
+    const form = new FormData()
+    const fields: Record<string, string> = {}
+    Object.keys(input.masks).forEach((key, i) => (fields[key] = `mask_${i}`))
+    form.append('data', JSON.stringify({ revision: input.revision, state: input.state, masks: fields }))
+    form.append('original', input.original, input.original.name)
+    form.append('reference', input.reference, 'reference.png')
+    form.append('thumbnail', input.thumbnail, 'thumbnail.jpg')
+    for (const [key, field] of Object.entries(fields)) form.append(field, input.masks[key], 'mask.png')
+    const res = await api.post<{ data: VizProject }>(`/visualizer/projects/${projectId}/render`, form, {
+      ...LONG,
+      onUploadProgress: (e) => e.total && onProgress?.(e.loaded / e.total),
+    })
+    return res.data.data
+  },
+
+  createShare: async (
+    projectId: string,
+    data: { title: string; message: string; showPrices: boolean; expiresInDays: number | null; options: ShareOptionInput[] },
+    original: Blob,
+    images: Blob[]
+  ): Promise<VizShare> => {
+    const form = new FormData()
+    form.append('data', JSON.stringify(data))
+    form.append('original', original, 'original.jpg')
+    images.forEach((b, i) => form.append(`option_${i}`, b, `option-${i}.jpg`))
+    return (await api.post<{ data: VizShare }>(`/visualizer/projects/${projectId}/shares`, form, LONG)).data.data
+  },
+
+  listShares: async (projectId: string): Promise<VizShare[]> =>
+    (await api.get<{ data: VizShare[] }>(`/visualizer/projects/${projectId}/shares`)).data.data,
+
+  deleteShare: async (id: string): Promise<void> => {
+    await api.delete(`/visualizer/shares/${id}`)
+  },
+}
+
+/** Client review links — no login. */
+export const visualizerPublicApi = {
+  getShare: async (token: string): Promise<PublicShare> =>
+    (await publicApi.get<{ data: PublicShare }>(`/visualizer-public/shares/${token}`)).data.data,
+
+  decide: async (token: string, body: { optionId: string; name: string; comment: string }) =>
+    (await publicApi.post<{ data: { decision: VizShareDecision; comments: VizShareComment[] } }>(`/visualizer-public/shares/${token}/decision`, body)).data.data,
+
+  comment: async (token: string, body: { optionId: string | null; name: string; message: string }) =>
+    (await publicApi.post<{ data: { comments: VizShareComment[] } }>(`/visualizer-public/shares/${token}/comments`, body)).data.data,
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2, RotateCcw, Upload } from 'lucide-react'
+import { Loader2, Pipette, RotateCcw, Upload, X } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,8 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { apiErrorMessage, visualizerApi, type MaterialInput } from '@/api/visualizer'
 import { decodeForDisplay, encodePng } from '@/lib/visualizer/imageio'
-import { limitSize, prepareMaterial } from '@/lib/visualizer/material'
-import { hexToRgb } from '@/lib/visualizer/color'
+import { limitSize, prepareMaterial, samplePatch } from '@/lib/visualizer/material'
+import { hexToRgb, rgbToHex } from '@/lib/visualizer/color'
 import {
   FINISHES,
   MATERIAL_CATEGORIES,
@@ -78,6 +78,10 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
   const [preparedPreview, setPreparedPreview] = useState<RGBAImage | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [prepChanged, setPrepChanged] = useState(false)
+  const [whiteBalance, setWhiteBalance] = useState<[number, number, number] | null>(null)
+  const [pickingWhite, setPickingWhite] = useState(false)
+  const [seamlessMode, setSeamlessMode] = useState<'blend' | 'cut'>('cut')
+  const [expand, setExpand] = useState<1 | 2>(1)
 
   // Reset the form whenever the dialog opens.
   useEffect(() => {
@@ -102,6 +106,11 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
     setCorners(null)
     setPreparedPreview(null)
     setPrepChanged(false)
+    setWhiteBalance(m?.settings?.prep?.whiteBalance ?? null)
+    setPickingWhite(false)
+    // Existing materials keep the method they were prepared with.
+    setSeamlessMode(m?.settings?.prep?.seamlessMode ?? (m ? 'blend' : 'cut'))
+    setExpand(m?.settings?.prep?.expand ?? 1)
     // Physical size of the cornered sample region (before seamless trimming).
     setWidthMm(m?.settings?.prep?.regionWidthMm ?? m?.widthMm ?? 600)
     setHeightMm(m?.settings?.prep?.regionHeightMm ?? m?.heightMm ?? 600)
@@ -130,14 +139,14 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
     if (kind !== 'texture' || !photo || !corners || widthMm <= 0 || heightMm <= 0) return
     const t = setTimeout(() => {
       try {
-        const r = prepareMaterial(photo, { corners, widthMm, heightMm, delight, seamless, maxSide: 384 })
+        const r = prepareMaterial(photo, { corners, widthMm, heightMm, delight, seamless, maxSide: 384, whiteBalance, seamlessMode, expand: isTile ? 1 : expand })
         setPreparedPreview(r.texture)
       } catch {
         setPreparedPreview(null)
       }
     }, 150)
     return () => clearTimeout(t)
-  }, [kind, photo, corners, widthMm, heightMm, delight, seamless])
+  }, [kind, photo, corners, widthMm, heightMm, delight, seamless, whiteBalance, seamlessMode, expand, isTile])
 
   const onPickPhoto = async (file: File | undefined) => {
     if (!file) return
@@ -149,6 +158,7 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
       setPhotoFile(file)
       setPhotoScale(small.width / full.width)
       setCorners(fullQuad(small))
+      setWhiteBalance(null)
       setPrepChanged(true)
       if (!name) setName(file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').slice(0, 120))
     } catch (err) {
@@ -187,6 +197,9 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
             seamless,
             regionWidthMm: widthMm,
             regionHeightMm: heightMm,
+            whiteBalance,
+            seamlessMode,
+            expand: isTile ? 1 : expand,
           },
           defaultPattern: isTile ? 'tiles' : 'continuous',
           tile: { layout, groutMm, groutColor, variation },
@@ -196,7 +209,7 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
         let texture: Blob | undefined
         let physical = { widthMm, heightMm }
         if (needsTexture) {
-          const prepared = prepareMaterial(photo, { corners, widthMm, heightMm, delight, seamless, maxSide: TEXTURE_MAX_SIDE })
+          const prepared = prepareMaterial(photo, { corners, widthMm, heightMm, delight, seamless, maxSide: TEXTURE_MAX_SIDE, whiteBalance, seamlessMode, expand: isTile ? 1 : expand })
           texture = await encodePng(prepared.texture)
           physical = { widthMm: prepared.widthMm, heightMm: prepared.heightMm }
         } else {
@@ -270,8 +283,39 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
               </div>
             ) : photo && corners ? (
               <>
-                <CornerEditor photo={photo} corners={corners} onChange={setPrep(setCorners)} />
+                <CornerEditor
+                  photo={photo}
+                  corners={corners}
+                  onChange={setPrep(setCorners)}
+                  onPick={
+                    pickingWhite
+                      ? (p) => {
+                          setWhiteBalance(samplePatch(photo, p.x, p.y, Math.max(3, Math.round(Math.min(photo.width, photo.height) / 150))))
+                          setPickingWhite(false)
+                          setPrepChanged(true)
+                        }
+                      : undefined
+                  }
+                />
                 <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={pickingWhite ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPickingWhite((v) => !v)}
+                    title="Click a white or grey card (or a known neutral area) in the photo to remove its colour cast"
+                    data-testid="viz-wb-pick"
+                  >
+                    <Pipette className="mr-1.5 h-3.5 w-3.5" /> {pickingWhite ? 'Click a neutral spot…' : 'White balance'}
+                  </Button>
+                  {whiteBalance && (
+                    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+                      <span className="h-3 w-3 rounded-sm border" style={{ backgroundColor: rgbToHex(...whiteBalance) }} /> neutral set
+                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => { setWhiteBalance(null); setPrepChanged(true) }} aria-label="Remove white balance">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  )}
                   <Button type="button" variant="outline" size="sm" onClick={() => { setCorners(fullQuad(photo)); setPrepChanged(true) }}>
                     <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset corners
                   </Button>
@@ -298,7 +342,26 @@ export function MaterialDialog({ open, onOpenChange, material, defaultKind = 'te
                 </div>
                 <TiledPreview image={preparedPreview} tiles={3} />
                 <RangeField label="Remove photographed lighting" value={delight} min={0} max={1} step={0.05} onChange={setPrep(setDelight)} format={(v) => `${Math.round(v * 100)}%`} hint="Evens out hot-spots and vignetting from the photo" />
-                <RangeField label="Seamless blend" value={seamless} min={0} max={0.4} step={0.01} onChange={setPrep(setSeamless)} format={(v) => (v === 0 ? 'Off' : `${Math.round(v * 100)}%`)} hint="Cross-fades opposite edges so the repeat is invisible. Use Off for single tiles with their own borders." />
+                <RangeField label="Seamless repeat" value={seamless} min={0} max={0.4} step={0.01} onChange={setPrep(setSeamless)} format={(v) => (v === 0 ? 'Off' : `${Math.round(v * 100)}%`)} hint="Joins opposite edges so the repeat is invisible. Use Off for single tiles with their own borders." />
+                {seamless > 0 && (
+                  <Segmented
+                    size="xs"
+                    value={seamlessMode}
+                    onChange={setPrep(setSeamlessMode)}
+                    options={[
+                      { value: 'cut', label: 'Seam cut (grain, stone)', title: 'Joins the edges along the best-matching line — no ghosted double grain' },
+                      { value: 'blend', label: 'Cross-fade', title: 'Fades one edge into the other — fine for soft, uniform textures' },
+                    ]}
+                  />
+                )}
+                {!isTile && seamless > 0 && (
+                  <label className="flex items-start gap-2 text-xs" title="Builds a texture twice as large per side from pieces of the sample, so big surfaces repeat 4× less">
+                    <input type="checkbox" checked={expand === 2} onChange={(e) => setPrep(setExpand)(e.target.checked ? 2 : 1)} className="mt-0.5" data-testid="viz-expand" />
+                    <span>
+                      Expand sample ×2 <span className="text-muted-foreground">— less visible repetition on large wardrobes and walls (slower to prepare)</span>
+                    </span>
+                  </label>
+                )}
               </div>
             )}
           </div>
@@ -383,7 +446,7 @@ function round2(v: number) {
 }
 
 /** Photo with four draggable corner handles (TL, TR, BR, BL). */
-function CornerEditor({ photo, corners, onChange }: { photo: RGBAImage; corners: Quad; onChange: (q: Quad) => void }) {
+function CornerEditor({ photo, corners, onChange, onPick }: { photo: RGBAImage; corners: Quad; onChange: (q: Quad) => void; onPick?: (p: { x: number; y: number }) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const [drag, setDrag] = useState<number | null>(null)
@@ -419,7 +482,10 @@ function CornerEditor({ photo, corners, onChange }: { photo: RGBAImage; corners:
       <svg
         ref={svgRef}
         viewBox={`0 0 ${photo.width} ${photo.height}`}
-        className="absolute inset-0 h-full w-full touch-none overflow-visible"
+        className={`absolute inset-0 h-full w-full touch-none overflow-visible ${onPick ? 'cursor-cell' : ''}`}
+        onPointerDown={(e) => {
+          if (onPick) onPick(toImage(e))
+        }}
         onPointerMove={(e) => {
           if (drag === null) return
           const p = toImage(e)
@@ -445,9 +511,11 @@ function CornerEditor({ photo, corners, onChange }: { photo: RGBAImage; corners:
               fillOpacity={0.35}
               stroke="#fff"
               strokeWidth={handle / 5}
-              className="cursor-move"
+              className={onPick ? 'pointer-events-none' : 'cursor-move'}
               aria-label={`Corner ${labels[i]}`}
               onPointerDown={(e) => {
+                if (onPick) return
+                e.stopPropagation()
                 ;(e.target as Element).setPointerCapture?.(e.pointerId)
                 setDrag(i)
               }}

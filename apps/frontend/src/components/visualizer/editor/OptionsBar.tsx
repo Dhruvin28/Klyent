@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { BadgeCheck, Copy, Plus, Trash2 } from 'lucide-react'
+import { BadgeCheck, Copy, Layers, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import type { VizOption } from '@/lib/visualizer/types'
 import type { VizEditor } from './useVizEditor'
-
-const MAX_OPTIONS = 20
+import { MAX_OPTIONS, VariantsDialog } from './VariantsDialog'
 
 function nextName(options: VizOption[]) {
   for (let i = 0; i < 26; i++) {
@@ -21,6 +20,7 @@ export function OptionsBar({ editor }: { editor: VizEditor }) {
   const { state, setState } = editor
   const [renaming, setRenaming] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<VizOption | null>(null)
+  const [variantsOpen, setVariantsOpen] = useState(false)
 
   const add = (copyFrom?: VizOption) => {
     if (state.options.length >= MAX_OPTIONS) return
@@ -94,6 +94,17 @@ export function OptionsBar({ editor }: { editor: VizEditor }) {
             <Copy className="h-3.5 w-3.5" /> Duplicate
           </Button>
           <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={() => setVariantsOpen(true)}
+            disabled={state.options.length >= MAX_OPTIONS || !state.surfaces.length}
+            title="Try several materials on one surface — one option each"
+            data-testid="viz-variants"
+          >
+            <Layers className="h-3.5 w-3.5" /> Variants
+          </Button>
+          <Button
             variant={state.approvedOptionId === active.id ? 'default' : 'ghost'}
             size="sm"
             className="h-8 gap-1"
@@ -109,6 +120,7 @@ export function OptionsBar({ editor }: { editor: VizEditor }) {
           )}
         </>
       )}
+      <VariantsDialog open={variantsOpen} onOpenChange={setVariantsOpen} editor={editor} />
       <ConfirmDialog
         open={!!confirm}
         onOpenChange={(o) => !o && setConfirm(null)}

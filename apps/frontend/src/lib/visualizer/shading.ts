@@ -21,6 +21,13 @@ export interface ShadingField {
   logS: Float32Array
   /** log of the reference (median) surface luminance. */
   logRef: number
+  /**
+   * Local light colour per grid cell (RGB triplets, ≈1): the surface's smoothed
+   * chromaticity relative to its average. Warm lamp pools read > 1 in red, cool
+   * window light > 1 in blue. Very low-frequency, so the old material's own colour
+   * pattern does not survive.
+   */
+  tint: Float32Array
 }
 
 export const LOG_EPS = 1e-4
@@ -48,6 +55,11 @@ export function estimateShading(img: RGBAImage, alpha: Uint8Array, bbox: BBox, s
   const I = new Float32Array(n)
   const M = new Float32Array(n)
   const count = new Float32Array(n)
+  // Linear RGB and luminance sums (weighted by coverage) for the light-colour field.
+  const cR = new Float32Array(n)
+  const cG = new Float32Array(n)
+  const cB = new Float32Array(n)
+  const cY = new Float32Array(n)
   for (let y = bbox.y0; y < bbox.y1; y++) {
     const gy = Math.min(gh - 1, Math.floor((y - bbox.y0) * scale))
     for (let x = bbox.x0; x < bbox.x1; x++) {
@@ -57,8 +69,16 @@ export function estimateShading(img: RGBAImage, alpha: Uint8Array, bbox: BBox, s
       const a = alpha[y * w + x]
       if (!a) continue
       const wt = a / 255
-      I[c] += logLuminanceAt(data, (y * w + x) * 4) * wt
+      const i = (y * w + x) * 4
+      I[c] += logLuminanceAt(data, i) * wt
       M[c] += wt
+      const r = SRGB_TO_LINEAR[data[i]] * wt
+      const g = SRGB_TO_LINEAR[data[i + 1]] * wt
+      const b = SRGB_TO_LINEAR[data[i + 2]] * wt
+      cR[c] += r
+      cG[c] += g
+      cB[c] += b
+      cY[c] += 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
   }
   let sumI = 0
@@ -131,7 +151,38 @@ export function estimateShading(img: RGBAImage, alpha: Uint8Array, bbox: BBox, s
   const logRef = samples.length ? samples[samples.length >> 1] : globalMean
 
   for (let c = 0; c < n; c++) q[c] -= logRef
-  return { bbox, scale, gw, gh, logS: q, logRef }
+  return { bbox, scale, gw, gh, logS: q, logRef, tint: lightTint(cR, cG, cB, cY, gw, gh, diag * scale) }
+}
+
+/**
+ * Smoothed chromaticity (RGB / luminance) relative to the surface average, by
+ * normalised convolution over a wide window (≈12% of the surface diagonal). Clamped
+ * so a strongly two-tone old material cannot push the new one far off its colour.
+ */
+function lightTint(cR: Float32Array, cG: Float32Array, cB: Float32Array, cY: Float32Array, gw: number, gh: number, diagCells: number): Float32Array {
+  const n = gw * gh
+  let tR = 0, tG = 0, tB = 0, tY = 0
+  for (let c = 0; c < n; c++) {
+    tR += cR[c]; tG += cG[c]; tB += cB[c]; tY += cY[c]
+  }
+  const tint = new Float32Array(n * 3).fill(1)
+  if (tY < 1e-6) return tint
+  const ref = [tR / tY, tG / tY, tB / tY]
+  const r = Math.max(1, Math.round(diagCells * 0.12))
+  const tmp = new Float32Array(n)
+  for (const f of [cR, cG, cB, cY]) {
+    boxBlurF32(f, gw, gh, r, tmp)
+    boxBlurF32(f, gw, gh, r, tmp)
+  }
+  for (let c = 0; c < n; c++) {
+    if (cY[c] < 1e-7) continue
+    const ch = [cR[c] / cY[c], cG[c] / cY[c], cB[c] / cY[c]]
+    for (let k = 0; k < 3; k++) {
+      const v = ref[k] > 1e-5 ? ch[k] / ref[k] : 1
+      tint[c * 3 + k] = v < 0.7 ? 0.7 : v > 1.4 ? 1.4 : v
+    }
+  }
+  return tint
 }
 
 /** Bilinear lookup of log-shading at image pixel (x, y) (integer pixel coords). */

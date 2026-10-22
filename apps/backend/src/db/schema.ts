@@ -639,7 +639,7 @@ export const vizAssets = mysqlTable(
     userId: varchar('user_id', { length: 128 }).notNull(),
     projectId: varchar('project_id', { length: 128 }),
     materialId: varchar('material_id', { length: 128 }),
-    kind: mysqlEnum('kind', ['original', 'reference', 'thumbnail', 'mask', 'material_source', 'material_texture', 'export_image', 'export_mask']).notNull(),
+    kind: mysqlEnum('kind', ['original', 'reference', 'thumbnail', 'mask', 'material_source', 'material_texture', 'export_image', 'export_mask', 'share_image']).notNull(),
     name: varchar('name', { length: 500 }).notNull(),
     mimeType: varchar('mime_type', { length: 255 }).notNull(),
     size: int('size').notNull(),
@@ -721,5 +721,60 @@ export const vizExports = mysqlTable(
   },
   (table) => ({
     projectIdx: index('viz_exports_project_idx').on(table.projectId),
+  })
+)
+
+/** One option shown to the client on a share link, with its pre-rendered image. */
+export interface VizShareOption {
+  optionId: string
+  name: string
+  notes: string
+  imageAssetId: string
+  /** Optional cost summary shown to the client. */
+  total: number | null
+  areaSqft: number | null
+  materials: { name: string; brand: string | null; code: string | null; surfaces: string[] }[]
+}
+
+export interface VizShareDecision {
+  optionId: string
+  optionName: string
+  clientName: string
+  comment: string
+  decidedAt: string
+}
+
+export interface VizShareComment {
+  id: string
+  optionId: string | null
+  name: string
+  message: string
+  createdAt: string
+}
+
+// Client review links: a frozen set of rendered options the client can compare, comment
+// on and approve without an account.
+export const vizShares = mysqlTable(
+  'viz_shares',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    token: varchar('token', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    message: text('message'),
+    originalAssetId: varchar('original_asset_id', { length: 128 }).notNull(),
+    options: json('options').$type<VizShareOption[]>().notNull(),
+    showPrices: boolean('show_prices').notNull().default(false),
+    decision: json('decision').$type<VizShareDecision | null>(),
+    comments: json('comments').$type<VizShareComment[]>(),
+    expiresAt: timestamp('expires_at', { fsp: 3 }),
+    revokedAt: timestamp('revoked_at', { fsp: 3 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex('viz_shares_token_idx').on(table.token),
+    projectIdx: index('viz_shares_project_idx').on(table.projectId),
   })
 )

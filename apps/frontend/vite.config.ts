@@ -27,7 +27,7 @@ export default defineConfig({
         // Online-first: precache only the app shell, never cache API calls
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // The visualizer's AI-select runtime (~27MB WASM) loads on demand only.
-        globIgnores: ['**/*.wasm', '**/sam.worker-*.js'],
+        globIgnores: ['**/*.wasm', '**/sam.worker-*.js', '**/seg.worker-*.js'],
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [],
       },

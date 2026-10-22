@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { visualizerApi, type VizProject } from '@/api/visualizer'
 import { EngineClient, type Frame } from '@/lib/visualizer/engineClient'
-import { PROTECT_KEY, type RenderSpec, type SpecSurface } from '@/lib/visualizer/engine'
+import { PROTECT_KEY, type RenderSpec, type SpecSurface, type SurfaceMeasurement } from '@/lib/visualizer/engine'
 import { decodePngExact } from '@/lib/visualizer/imageio'
 import { SamClient } from '@/lib/visualizer/samClient'
+import { SegClient } from '@/lib/visualizer/segClient'
+import { estimateAspectRatio, isConvexQuad, quadToTuples } from '@/lib/visualizer/homography'
 import type { Mask, RGBAImage, VizAssignment, VizMaterial, VizOption, VizState, VizSurface } from '@/lib/visualizer/types'
 
 export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'error' | 'conflict'
@@ -43,6 +45,11 @@ export function defaultAssignment(material: VizMaterial): VizAssignment {
     smoothing: 0.5,
     exposure: 1,
     tile: s?.tile ?? { layout: 'grid', groutMm: 2, groutColor: '#cfcac2', variation: true },
+    mode: 'replace',
+    panelMode: 'continuous',
+    panelSeed: 1,
+    reflection: 0,
+    lightColor: 0.6,
   }
 }
 
@@ -60,6 +67,7 @@ export function buildSpec(state: VizState, option: VizOption, materials: Map<str
       widthMm: s.widthMm,
       heightMm: s.heightMm,
       feather: s.feather,
+      edgeSnap: s.edgeSnap,
       assignment: a,
       material:
         m.kind === 'paint'
@@ -67,7 +75,7 @@ export function buildSpec(state: VizState, option: VizOption, materials: Map<str
           : { kind: 'texture', materialId: m.id, widthMm: m.widthMm ?? 1000, heightMm: m.heightMm ?? 1000 },
     })
   }
-  return { surfaces }
+  return { surfaces, calibration: state.calibration ?? null }
 }
 
 export function useVizEditor(project: VizProject, materialsList: VizMaterial[]) {
@@ -88,6 +96,7 @@ export function useVizEditor(project: VizProject, materialsList: VizMaterial[]) 
   const originalRef = useRef<RGBAImage | null>(null)
   const engineRef = useRef<EngineClient | null>(null)
   const samRef = useRef<SamClient | null>(null)
+  const segRef = useRef<SegClient | null>(null)
   const masks = useRef(new Map<string, MaskEntry>())
   const revision = useRef(project.revision)
   const stateRef = useRef(state)
@@ -120,6 +129,7 @@ export function useVizEditor(project: VizProject, materialsList: VizMaterial[]) 
     const engine = new EngineClient()
     engineRef.current = engine
     samRef.current = new SamClient()
+    segRef.current = new SegClient()
     ;(async () => {
       try {
         const blob = await visualizerApi.getAssetBlob(project.referenceAssetId)
@@ -153,6 +163,7 @@ export function useVizEditor(project: VizProject, materialsList: VizMaterial[]) 
       cancelled = true
       engine.dispose()
       samRef.current?.dispose()
+      segRef.current?.dispose()
     }
   }, [project.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -526,9 +537,81 @@ export function useVizEditor(project: VizProject, materialsList: VizMaterial[]) 
     return engineRef.current!.exportPng(buildSpec(s, o, materials))
   }, [materials])
 
+  // ── real-world areas (for quantities): re-measured when geometry or selections change ─
+  const [areas, setAreas] = useState<Map<string, SurfaceMeasurement>>(new Map())
+  const geometryKey = useMemo(
+    () => JSON.stringify(state.surfaces.map((s) => [s.id, s.quad, s.widthMm, s.heightMm, s.feather, !!s.edgeSnap])),
+    [state.surfaces]
+  )
+  useEffect(() => {
+    if (!ready) return
+    let cancelled = false
+    const t = setTimeout(() => {
+      const surfaces = stateRef.current.surfaces.map((s) => ({ id: s.id, quad: s.quad, widthMm: s.widthMm, heightMm: s.heightMm, feather: s.feather, edgeSnap: s.edgeSnap }))
+      engineRef.current
+        ?.measure(surfaces)
+        .then((list) => !cancelled && setAreas(new Map(list.map((m) => [m.id, m]))))
+        .catch(() => undefined)
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [ready, geometryKey, maskTick])
+
+  /** Adds surfaces together with their selections (one undo step per selection). */
+  const addSurfaces = useCallback((items: { surface: VizSurface; mask: Uint8Array }[]) => {
+    setState((s) => ({ ...s, surfaces: [...s.surfaces, ...items.map((i) => i.surface)] }))
+    for (const { surface, mask } of items) editMask(surface.id, (m) => m.data.set(mask))
+  }, [setState, editMask])
+
+  /** Fits the perspective corners to the surface's selection; returns false when it is not four-sided. */
+  const fitCorners = useCallback(async (surfaceId: string): Promise<boolean> => {
+    const engine = engineRef.current
+    if (!engine) return false
+    await pushMaskToEngine(surfaceId)
+    const quad = await engine.fitQuad(surfaceId)
+    if (!quad) return false
+    const s = stateRef.current.surfaces.find((x) => x.id === surfaceId)
+    const patch: Partial<VizSurface> = { quad: quadToTuples(quad) }
+    // Keep the entered width; re-estimate the height from the new perspective unless it was typed in.
+    if (s && !s.heightManual && isConvexQuad(quad)) {
+      const aspect = estimateAspectRatio(quad, W, H)
+      if (Number.isFinite(aspect) && aspect > 0) patch.heightMm = Math.max(1, Math.min(100_000, Math.round(s.widthMm / aspect)))
+    }
+    updateSurface(surfaceId, patch)
+    return true
+  }, [pushMaskToEngine, updateSurface, W, H])
+
+  /** Permanently snaps a saved selection's outline to the render's edges (undoable). */
+  const snapSelection = useCallback(async (key: string) => {
+    const engine = engineRef.current
+    const e = masks.current.get(key)
+    if (!engine || !e) return
+    const snapped = await engine.snapEdges(e.data)
+    editMask(key, (m) => m.data.set(snapped))
+  }, [editMask])
+
+  /** Non-empty selections (surfaces + protect), for carrying them over to a replacement render. */
+  const nonEmptyMasks = useCallback(() => {
+    const out = new Map<string, Uint8Array>()
+    for (const key of [...stateRef.current.surfaces.map((s) => s.id), PROTECT_KEY]) {
+      const e = masks.current.get(key)
+      if (e && e.data.some((v) => v !== 0)) out.set(key, e.data)
+    }
+    return out
+  }, [])
+
   return {
     W,
     H,
+    seg: segRef,
+    nonEmptyMasks,
+    revision: () => revision.current,
+    areas,
+    addSurfaces,
+    fitCorners,
+    snapSelection,
     ready,
     loadError,
     original: originalRef,

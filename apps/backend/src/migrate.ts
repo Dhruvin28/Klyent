@@ -452,7 +452,7 @@ const CREATE_STATEMENTS = [
     \`user_id\` VARCHAR(128) NOT NULL,
     \`project_id\` VARCHAR(128),
     \`material_id\` VARCHAR(128),
-    \`kind\` ENUM('original','reference','thumbnail','mask','material_source','material_texture','export_image','export_mask') NOT NULL,
+    \`kind\` ENUM('original','reference','thumbnail','mask','material_source','material_texture','export_image','export_mask','share_image') NOT NULL,
     \`name\` VARCHAR(500) NOT NULL,
     \`mime_type\` VARCHAR(255) NOT NULL,
     \`size\` INT NOT NULL,
@@ -522,6 +522,32 @@ const CREATE_STATEMENTS = [
     PRIMARY KEY (\`id\`),
     INDEX \`viz_exports_project_idx\` (\`project_id\`)
   )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_shares\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128) NOT NULL,
+    \`token\` VARCHAR(128) NOT NULL,
+    \`title\` VARCHAR(255) NOT NULL,
+    \`message\` TEXT,
+    \`original_asset_id\` VARCHAR(128) NOT NULL,
+    \`options\` JSON NOT NULL,
+    \`show_prices\` BOOLEAN NOT NULL DEFAULT FALSE,
+    \`decision\` JSON,
+    \`comments\` JSON,
+    \`expires_at\` TIMESTAMP(3) NULL,
+    \`revoked_at\` TIMESTAMP(3) NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`viz_shares_token_idx\` (\`token\`),
+    INDEX \`viz_shares_project_idx\` (\`project_id\`)
+  )`,
+]
+
+// ENUM columns that gained values: [table, column, full definition, value that must exist]
+const ENUM_UPDATES: [string, string, string, string][] = [
+  ['viz_assets', 'kind', "ENUM('original','reference','thumbnail','mask','material_source','material_texture','export_image','export_mask','share_image') NOT NULL", 'share_image'],
 ]
 
 // Columns to add to existing tables: [table, column, definition]
@@ -533,6 +559,8 @@ const ALTER_COLUMNS: [string, string, string][] = [
   ['users', 'company_website',  'VARCHAR(500)'],
   ['users', 'company_gstin',    'VARCHAR(20)'],
   ['users', 'studio_ingestion_key_hash', 'VARCHAR(255)'],
+  ['users', 'password_reset_otp_hash', 'VARCHAR(255)'],
+  ['users', 'password_reset_otp_expires_at', 'TIMESTAMP NULL'],
   ['payments', 'freelance_project_id', 'VARCHAR(128)'],
   ['files',    'freelance_project_id', 'VARCHAR(128)'],
   ['proposals', 'proposal_type', "ENUM('STANDARD','COST_BREAKUP') NOT NULL DEFAULT 'STANDARD'"],
@@ -589,6 +617,19 @@ export async function runMigrations() {
     if (rows[0]?.IS_NULLABLE === 'NO') {
       await connection.execute(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`)
       console.log(`[migrate] Made ${table}.${column} nullable`)
+    }
+  }
+
+  // Widen ENUMs (only when the new value is missing, so this is a no-op once applied)
+  for (const [table, column, definition, value] of ENUM_UPDATES) {
+    const [rows] = await connection.execute(
+      `SELECT COLUMN_TYPE AS t FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+      [table, column]
+    ) as [{ t: string }[], unknown]
+    if (rows[0] && !rows[0].t.includes(`'${value}'`)) {
+      await connection.execute(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`)
+      console.log(`[migrate] Extended ${table}.${column} with '${value}'`)
     }
   }
 

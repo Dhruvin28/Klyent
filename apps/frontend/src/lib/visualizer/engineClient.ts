@@ -1,7 +1,7 @@
 import type { EngineRequest, EngineResponse } from './engine.worker'
-import type { RenderSpec } from './engine'
+import type { MeasureSurface, RenderSpec, SurfaceMeasurement } from './engine'
 import type { SmartSelectOptions } from './mask'
-import type { RGBAImage, VerificationReport } from './types'
+import type { Quad, RGBAImage, VerificationReport } from './types'
 
 type Pending = { resolve: (r: EngineResponse) => void; reject: (e: Error) => void }
 
@@ -83,6 +83,26 @@ export class EngineClient {
 
   async smartSelect(seed: { x: number; y: number }, opts: SmartSelectOptions): Promise<Uint8Array> {
     const r = await this.call({ type: 'smartSelect', seed, opts })
+    if (r.type !== 'mask') throw new Error('Unexpected engine response')
+    return new Uint8Array(r.data)
+  }
+
+  async measure(surfaces: MeasureSurface[]): Promise<SurfaceMeasurement[]> {
+    const r = await this.call({ type: 'measure', surfaces })
+    if (r.type !== 'measured') throw new Error('Unexpected engine response')
+    return r.surfaces
+  }
+
+  /** Fits the perspective corners to a surface's selection (null when it is not four-sided). */
+  async fitQuad(key: string): Promise<Quad | null> {
+    const r = await this.call({ type: 'fitQuad', key })
+    if (r.type !== 'quad') throw new Error('Unexpected engine response')
+    return r.quad
+  }
+
+  async snapEdges(data: Uint8Array): Promise<Uint8Array> {
+    const copy = data.slice()
+    const r = await this.call({ type: 'snapEdges', data: copy.buffer }, [copy.buffer])
     if (r.type !== 'mask') throw new Error('Unexpected engine response')
     return new Uint8Array(r.data)
   }

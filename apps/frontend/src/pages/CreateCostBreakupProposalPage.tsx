@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, ChevronLeft, ChevronRight, Check, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import { CostBreakupProposalPDF } from '@/components/proposals/CostBreakupProposalPDF'
 import { proposalsApi } from '@/api/proposals'
+import { clientsApi } from '@/api/clients'
+import type { ProposalPrefill } from '@/lib/visualizer/proposalPrefill'
 import { useAuthStore } from '@/store/auth.store'
 import { useToast } from '@/components/ui/toast'
 import { numberToWords } from '@/lib/numberToWords'
@@ -404,6 +406,9 @@ export function CreateCostBreakupProposalPage() {
   const { user } = useAuthStore()
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
+  // Draft handed over from the Material Visualizer's quantities ("Send to proposal").
+  const fromVisualizer = (location.state as { fromVisualizer?: ProposalPrefill } | null)?.fromVisualizer ?? null
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [savedProposal, setSavedProposal] = useState<Proposal | null>(null)
@@ -420,14 +425,20 @@ export function CreateCostBreakupProposalPage() {
     enabled: !!sourceId,
   })
 
+  const { data: vizClient } = useQuery({
+    queryKey: ['client', fromVisualizer?.source.clientId],
+    queryFn: () => clientsApi.getClient(fromVisualizer!.source.clientId!),
+    enabled: !!fromVisualizer?.source.clientId && !sourceId,
+  })
+
   const [form, setForm] = useState<FormData>(() => {
     const d = today()
+    const viz = sourceId ? null : fromVisualizer
     return {
       clientName: '',
       clientPhone: '',
       clientEmail: '',
       clientAddress: '',
-      siteName: '',
       projectLocation: '',
       projectType: 'Residential',
       projectScope: 'Full Interior Design & Turnkey Solutions',
@@ -436,12 +447,32 @@ export function CreateCostBreakupProposalPage() {
       date: d,
       validTill: addDays(d, 30),
       aboutCompany: '',
-      materialSections: defaultMaterialSections(),
-      costBreakupItems: defaultCostBreakup(),
+      siteName: viz ? viz.source.projectName.slice(0, 200) : '',
+      materialSections: viz
+        ? [
+            { id: uid(), title: viz.materialSection.title, rateLabel: viz.materialSection.rateLabel, items: viz.materialSection.items.map((i) => ({ ...i, id: uid() })) },
+            ...defaultMaterialSections(),
+          ]
+        : defaultMaterialSections(),
+      costBreakupItems: viz && viz.costBreakupItems.length ? viz.costBreakupItems.map((c) => ({ ...c, id: uid() })) : defaultCostBreakup(),
       feesNote: 'All prices are estimates subject to final measurement & design confirmation.',
       termsAndConditions: [],
     }
   })
+
+  // Fill the client's details once the visualizer project's client has loaded (without overwriting edits).
+  const clientPrefilled = useRef(false)
+  useEffect(() => {
+    if (!vizClient || clientPrefilled.current) return
+    clientPrefilled.current = true
+    setForm((f) => ({
+      ...f,
+      clientName: f.clientName || vizClient.name,
+      clientPhone: f.clientPhone || vizClient.phone || '',
+      clientEmail: f.clientEmail || vizClient.email || '',
+      clientAddress: f.clientAddress || vizClient.address || '',
+    }))
+  }, [vizClient])
 
   const set = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))

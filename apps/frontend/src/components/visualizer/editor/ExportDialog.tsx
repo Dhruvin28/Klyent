@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { CheckCircle2, Download, FileJson, FileText, Image as ImageIcon, Loader2, ShieldCheck, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, Download, FileJson, FileText, Image as ImageIcon, Loader2, Presentation, Send, ShieldCheck, Trash2, XCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { apiErrorMessage, visualizerApi, type ExportDetails, type VizExport, type VizProject } from '@/api/visualizer'
 import { useVizExports } from '@/hooks/useVisualizer'
+import { useLogoDataUrl } from '@/hooks/useLogoDataUrl'
+import { useAuthStore } from '@/store/auth.store'
+import { SQFT_PER_SQM, estimateOption, formatQuantity, type OptionEstimate } from '@/lib/visualizer/estimate'
+import { blobToDataUrl, downloadBlob, slug, toJpeg } from '@/lib/visualizer/outputs'
+import { optionAreas } from './EstimateDialog'
 import type { VerificationReport, VizMaterial, VizState } from '@/lib/visualizer/types'
 import type { VizEditor } from './useVizEditor'
 
-export function buildExportDetails(projectName: string, state: VizState, optionId: string, materials: Map<string, VizMaterial>, size: { width: number; height: number }): ExportDetails {
+export function buildExportDetails(
+  projectName: string,
+  state: VizState,
+  optionId: string,
+  materials: Map<string, VizMaterial>,
+  size: { width: number; height: number },
+  estimate?: OptionEstimate
+): ExportDetails {
   const option = state.options.find((o) => o.id === optionId)!
   const surfaces: ExportDetails['surfaces'] = []
   for (const s of state.surfaces) {
@@ -60,22 +72,25 @@ export function buildExportDetails(projectName: string, state: VizState, optionI
     generatedAt: new Date().toISOString(),
     image: size,
     surfaces,
+    ...(estimate && estimate.lines.length
+      ? {
+          quantities: {
+            lines: estimate.lines.map((l) => ({
+              material: l.material.name,
+              brand: l.material.brand,
+              code: l.material.code,
+              surfaces: l.surfaces,
+              areaSqft: Math.round(l.areaSqm * SQFT_PER_SQM * 10) / 10,
+              quantity: formatQuantity(l),
+              basis: l.basis,
+              amount: l.cost,
+            })),
+            total: estimate.total,
+            unpriced: estimate.unpriced,
+          },
+        }
+      : {}),
   }
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
-
-function slug(s: string) {
-  return s.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'export'
 }
 
 async function jpegDataUrl(blob: Blob, maxSide = 2000): Promise<string> {
@@ -115,6 +130,12 @@ export function ExportDialog({ open, onOpenChange, editor, project }: { open: bo
   const [last, setLast] = useState<{ client: VerificationReport; server: VerificationReport; exp: VizExport } | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [pdfBusy, setPdfBusy] = useState<string | null>(null)
+  const [jpegSide, setJpegSide] = useState(2560)
+  const [watermark, setWatermark] = useState(true)
+  const [deckPrices, setDeckPrices] = useState(true)
+  const logo = useLogoDataUrl()
+  const user = useAuthStore((st) => st.user)
+  const wm = watermark && (logo || user?.companyName) ? { logo, text: user?.companyName ?? null } : null
 
   useEffect(() => {
     if (open) {
@@ -142,7 +163,8 @@ export function ExportDialog({ open, onOpenChange, editor, project }: { open: bo
         setWarning(`Not applied: ${names.join(', ')} (${out.skipped[0].reason.toLowerCase()}).`)
       }
       setStep('Verifying on server…')
-      const details = buildExportDetails(project.name, editor.state, option.id, editor.materials, { width: editor.W, height: editor.H })
+      const estimate = estimateOption(optionAreas(editor, option), editor.materials)
+      const details = buildExportDetails(project.name, editor.state, option.id, editor.materials, { width: editor.W, height: editor.H }, estimate)
       const exp = await visualizerApi.createExport(project.id, { optionId: option.id, details }, out.image, out.mask)
       setLast({ client: out.report, server: exp.verification, exp })
       await qc.invalidateQueries({ queryKey: ['visualizer', 'exports', project.id] })
@@ -155,12 +177,60 @@ export function ExportDialog({ open, onOpenChange, editor, project }: { open: bo
     }
   }
 
-  const download = async (e: VizExport, what: 'image' | 'mask' | 'json' | 'pdf') => {
+  /** Every option rendered at full quality, with its quantities, as one client-ready PDF. */
+  const presentation = async () => {
+    try {
+      setPdfBusy('deck')
+      const img = editor.original.current
+      if (!img) throw new Error('Render not loaded')
+      const toUrl = async (pixels: Uint8ClampedArray<ArrayBuffer>) => blobToDataUrl(await toJpeg({ pixels, width: editor.W, height: editor.H }, { maxSide: 2000, quality: 0.88, watermark: wm }))
+      const originalDataUrl = await toUrl(new Uint8ClampedArray(img.data))
+      const options = []
+      for (const o of editor.state.options) {
+        if (!Object.keys(o.assignments).length) continue
+        const f = await editor.renderOption(o.id)
+        options.push({
+          name: o.name,
+          notes: o.notes,
+          approved: editor.state.approvedOptionId === o.id,
+          imageDataUrl: await toUrl(f.pixels),
+          estimate: estimateOption(optionAreas(editor, o), editor.materials),
+        })
+      }
+      if (!options.length) throw new Error('No option has materials assigned yet')
+      const [{ pdf }, { PresentationPDF }, client] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('../PresentationPDF'),
+        project.clientId ? import('@/api/clients').then((m) => m.clientsApi.getClient(project.clientId!)).catch(() => null) : Promise.resolve(null),
+      ])
+      const file = await pdf(
+        <PresentationPDF
+          projectName={project.name}
+          clientName={client?.name ?? null}
+          company={user?.companyName ?? null}
+          logoDataUrl={logo}
+          originalDataUrl={originalDataUrl}
+          options={options}
+          showPrices={deckPrices}
+        />
+      ).toBlob()
+      downloadBlob(file, `${slug(project.name)}-design-options.pdf`)
+    } catch (err) {
+      toast({ title: 'Presentation failed', description: apiErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setPdfBusy(null)
+    }
+  }
+
+  const download = async (e: VizExport, what: 'image' | 'jpeg' | 'mask' | 'json' | 'pdf') => {
     const base = `${slug(e.details.project)}-${slug(e.optionName)}`
     try {
       setPdfBusy(`${e.id}:${what}`)
       if (what === 'json') {
         downloadBlob(new Blob([JSON.stringify({ ...e.details, verification: e.verification }, null, 2)], { type: 'application/json' }), `${base}-materials.json`)
+      } else if (what === 'jpeg') {
+        const blob = await visualizerApi.getAssetBlob(e.imageAssetId)
+        downloadBlob(await toJpeg(blob, { maxSide: jpegSide, quality: 0.86, watermark: wm }), `${base}${jpegSide ? `-${jpegSide}` : ''}.jpg`)
       } else if (what === 'image' || what === 'mask') {
         const blob = await visualizerApi.getAssetBlob(what === 'image' ? e.imageAssetId : e.maskAssetId)
         downloadBlob(blob, what === 'image' ? `${base}.png` : `${base}-edit-mask.png`)
@@ -240,8 +310,34 @@ export function ExportDialog({ open, onOpenChange, editor, project }: { open: bo
           )}
         </div>
 
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Presentation for the client</p>
+            <p className="text-[11px] text-muted-foreground">Every option rendered in full, with its materials and quantities, in one PDF.</p>
+          </div>
+          <label className="flex items-center gap-1.5 text-xs">
+            <input type="checkbox" checked={deckPrices} onChange={(ev) => setDeckPrices(ev.target.checked)} /> Include prices
+          </label>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={presentation} disabled={!!pdfBusy || !!step} data-testid="viz-presentation">
+            {pdfBusy === 'deck' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Presentation className="h-4 w-4" />} Presentation PDF
+          </Button>
+        </div>
+
         <div className="space-y-2 border-t pt-3">
-          <h4 className="text-sm font-semibold">Saved exports</h4>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h4 className="mr-auto text-sm font-semibold">Saved exports</h4>
+            <label className="flex items-center gap-1.5 text-xs" title="JPEG copies for WhatsApp and email">
+              <Send className="h-3 w-3" /> JPEG size
+              <select className="h-7 rounded border bg-background px-1 text-xs" value={jpegSide} onChange={(ev) => setJpegSide(Number(ev.target.value))} aria-label="JPEG size">
+                <option value={1600}>1600px (WhatsApp)</option>
+                <option value={2560}>2560px</option>
+                <option value={0}>Full size</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-xs" title={logo || user?.companyName ? 'Adds your logo and company name (from your profile)' : 'Add a logo or company name in your profile first'}>
+              <input type="checkbox" checked={watermark} disabled={!logo && !user?.companyName} onChange={(ev) => setWatermark(ev.target.checked)} /> Watermark
+            </label>
+          </div>
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : !exports?.length ? (
@@ -262,6 +358,7 @@ export function ExportDialog({ open, onOpenChange, editor, project }: { open: bo
                   {(
                     [
                       ['image', ImageIcon, 'PNG'],
+                      ['jpeg', Send, 'JPEG'],
                       ['pdf', FileText, 'Schedule PDF'],
                       ['json', FileJson, 'JSON'],
                       ['mask', Download, 'Mask'],
