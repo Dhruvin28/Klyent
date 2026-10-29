@@ -43,7 +43,8 @@ export default defineConfig({
     format: 'es',
   },
   optimizeDeps: {
-    exclude: ['@huggingface/transformers'],
+    // three-mesh-bvh resolves its BVH worker relative to its own file; pre-bundling breaks that URL.
+    exclude: ['@huggingface/transformers', 'three-mesh-bvh'],
   },
   server: {
     port: 5173,

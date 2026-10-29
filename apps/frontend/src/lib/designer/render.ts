@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
+import { GenerateMeshBVHWorker } from 'three-mesh-bvh/worker'
 import { EquirectCamera, WebGLPathTracer } from 'three-gpu-pathtracer'
 import { DesignScene, overviewCamera, type SceneContext } from './scene'
 import type { Plan, SavedCamera } from './types'
@@ -77,8 +78,10 @@ export function pathTrace(plan: Plan, ctx: SceneContext, job: TraceJob, onProgre
   let renderer: THREE.WebGLRenderer | null = null
   let tracer: WebGLPathTracer | null = null
   let ds: DesignScene | null = null
+  let bvhWorker: GenerateMeshBVHWorker | null = null
 
   const cleanup = () => {
+    bvhWorker?.dispose()
     tracer?.dispose()
     ds?.dispose()
     renderer?.dispose()
@@ -124,7 +127,19 @@ export function pathTrace(plan: Plan, ctx: SceneContext, job: TraceJob, onProgre
     const tiles = job.width * job.height > 2_500_000 ? 3 : job.width * job.height > 1_000_000 ? 2 : 1
     tracer.tiles.set(tiles, tiles)
     if (stop === 'cancel') throw new DOMException('Render cancelled', 'AbortError')
-    await tracer.setSceneAsync(ds.scene, camera)
+    // Build the BVH in a worker so the page stays responsive; fall back to the main
+    // thread if workers are unavailable (the parallel worker needs SharedArrayBuffer,
+    // which requires cross-origin isolation this app doesn't have).
+    try {
+      bvhWorker = new GenerateMeshBVHWorker()
+      tracer.setBVHWorker(bvhWorker)
+      await tracer.setSceneAsync(ds.scene, camera)
+    } catch {
+      bvhWorker?.dispose()
+      bvhWorker = null
+      if (stop === 'cancel') throw new DOMException('Render cancelled', 'AbortError')
+      tracer.setScene(ds.scene, camera)
+    }
 
     await new Promise<void>((resolve, reject) => {
       const tick = () => {
