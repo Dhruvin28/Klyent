@@ -20,6 +20,8 @@ import procurementRoutes from './routes/procurement'
 import aiRoutes from './routes/ai'
 import visualizerRoutes from './routes/visualizer'
 import visualizerPublicRoutes from './routes/visualizer/public'
+import designerRoutes from './routes/designer'
+import designerPublicRoutes from './routes/designer/public'
 import studioProjectRoutes from './routes/studio/projects'
 import studioGroupRoutes from './routes/studio/groups'
 import studioMessageRoutes from './routes/studio/messages'
@@ -123,6 +125,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(visualizerRoutes, { prefix: '/api/visualizer' })
   // Client review links (no login)
   await app.register(visualizerPublicRoutes, { prefix: '/api/visualizer-public' })
+
+  // 3D Designer — floor plans, furniture catalog, renders and virtual-tour links
+  await app.register(designerRoutes, { prefix: '/api/designer' })
+  await app.register(designerPublicRoutes, { prefix: '/api/designer-public' })
 
   // Studio AI — WhatsApp project knowledge engine
   await app.register(studioProjectRoutes, { prefix: '/api/studio/projects' })

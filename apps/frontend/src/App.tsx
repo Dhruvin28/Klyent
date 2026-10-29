@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -34,6 +35,13 @@ import { CreatePurchaseOrderPage } from '@/pages/procurement/CreatePurchaseOrder
 import { PurchaseOrderDetailPage } from '@/pages/procurement/PurchaseOrderDetailPage'
 import { PurchaseOrderSharePage } from '@/pages/procurement/PurchaseOrderSharePage'
 import { Toaster } from '@/components/ui/toast'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+
+// The 3D Designer pulls in three.js and the path tracer; load it only when opened.
+const DesignerPage = lazy(() => import('@/pages/designer/DesignerPage').then((m) => ({ default: m.DesignerPage })))
+const DesignerEditorPage = lazy(() => import('@/pages/designer/DesignerEditorPage').then((m) => ({ default: m.DesignerEditorPage })))
+const DesignerTourPage = lazy(() => import('@/pages/designer/DesignerTourPage').then((m) => ({ default: m.DesignerTourPage })))
+const lazyPage = (el: JSX.Element) => <Suspense fallback={<LoadingSpinner />}>{el}</Suspense>
 
 export default function App() {
   return (
@@ -48,6 +56,7 @@ export default function App() {
         <Route path="/share/:token" element={<SharePage />} />
         <Route path="/proposals/share/:token" element={<ProposalSharePage />} />
         <Route path="/visualizer/review/:token" element={<VisualizerReviewPage />} />
+        <Route path="/designer/tour/:token" element={lazyPage(<DesignerTourPage />)} />
         <Route path="/invoices/share/:token" element={<InvoiceSharePage />} />
         <Route path="/procurement/orders/share/:token" element={<PurchaseOrderSharePage />} />
 
@@ -78,6 +87,8 @@ export default function App() {
           <Route path="/studio/:id" element={<StudioProjectDetailPage />} />
           <Route path="/visualizer" element={<VisualizerPage />} />
           <Route path="/visualizer/:id" element={<VisualizerEditorPage />} />
+          <Route path="/designer" element={lazyPage(<DesignerPage />)} />
+          <Route path="/designer/:id" element={lazyPage(<DesignerEditorPage />)} />
         </Route>
 
         {/* Catch-all redirect */}

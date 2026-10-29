@@ -544,6 +544,80 @@ const CREATE_STATEMENTS = [
     INDEX \`viz_shares_project_idx\` (\`project_id\`)
   )`,
 
+  // ── 3D Designer ──
+  `CREATE TABLE IF NOT EXISTS \`design_projects\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`name\` VARCHAR(255) NOT NULL,
+    \`plan\` JSON NOT NULL,
+    \`revision\` INT NOT NULL DEFAULT 1,
+    \`thumbnail_asset_id\` VARCHAR(128),
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`design_projects_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`design_assets\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`model_id\` VARCHAR(128),
+    \`kind\` ENUM('thumbnail','underlay','render','panorama','video','model','model_thumb') NOT NULL,
+    \`name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255) NOT NULL,
+    \`size\` INT NOT NULL,
+    \`width\` INT,
+    \`height\` INT,
+    \`sha256\` VARCHAR(64) NOT NULL,
+    \`meta\` JSON,
+    \`data\` LONGBLOB NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`design_assets_user_idx\` (\`user_id\`),
+    INDEX \`design_assets_project_idx\` (\`project_id\`),
+    INDEX \`design_assets_model_idx\` (\`model_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`design_models\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`category\` VARCHAR(100) NOT NULL,
+    \`source\` ENUM('upload','polyhaven') NOT NULL,
+    \`source_ref\` VARCHAR(128),
+    \`glb_asset_id\` VARCHAR(128) NOT NULL,
+    \`thumb_asset_id\` VARCHAR(128),
+    \`width_mm\` DECIMAL(10,2) NOT NULL,
+    \`depth_mm\` DECIMAL(10,2) NOT NULL,
+    \`height_mm\` DECIMAL(10,2) NOT NULL,
+    \`price\` DECIMAL(15,2),
+    \`brand\` VARCHAR(255),
+    \`license\` VARCHAR(255),
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`design_models_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`design_shares\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128) NOT NULL,
+    \`token\` VARCHAR(128) NOT NULL,
+    \`title\` VARCHAR(255) NOT NULL,
+    \`message\` TEXT,
+    \`render_ids\` JSON NOT NULL,
+    \`expires_at\` TIMESTAMP(3) NULL,
+    \`revoked_at\` TIMESTAMP(3) NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`design_shares_token_idx\` (\`token\`),
+    INDEX \`design_shares_project_idx\` (\`project_id\`)
+  )`,
+
   `CREATE TABLE IF NOT EXISTS \`vendor_products\` (
     \`id\` VARCHAR(128) NOT NULL,
     \`user_id\` VARCHAR(128) NOT NULL,

@@ -952,3 +952,99 @@ export const vizShares = mysqlTable(
     projectIdx: index('viz_shares_project_idx').on(table.projectId),
   })
 )
+
+// ── 3D Designer ──
+// The floor plan (walls, openings, rooms, furniture, lighting, cameras) is one JSON
+// document per project; binary blobs (renders, panoramas, videos, GLB models,
+// underlays) live in design_assets and are referenced by id.
+
+export const designProjects = mysqlTable(
+  'design_projects',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    clientId: varchar('client_id', { length: 128 }),
+    name: varchar('name', { length: 255 }).notNull(),
+    plan: json('plan').notNull(),
+    revision: int('revision').notNull().default(1),
+    thumbnailAssetId: varchar('thumbnail_asset_id', { length: 128 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('design_projects_user_idx').on(table.userId),
+  })
+)
+
+export const designAssets = mysqlTable(
+  'design_assets',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }),
+    modelId: varchar('model_id', { length: 128 }),
+    kind: mysqlEnum('kind', ['thumbnail', 'underlay', 'render', 'panorama', 'video', 'model', 'model_thumb']).notNull(),
+    name: varchar('name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }).notNull(),
+    size: int('size').notNull(),
+    width: int('width'),
+    height: int('height'),
+    sha256: varchar('sha256', { length: 64 }).notNull(),
+    meta: json('meta'),
+    data: longblob('data').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('design_assets_user_idx').on(table.userId),
+    projectIdx: index('design_assets_project_idx').on(table.projectId),
+    modelIdx: index('design_assets_model_idx').on(table.modelId),
+  })
+)
+
+// User-level furniture catalog: uploaded GLBs and Poly Haven (CC0) imports.
+export const designModels = mysqlTable(
+  'design_models',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    category: varchar('category', { length: 100 }).notNull(),
+    source: mysqlEnum('source', ['upload', 'polyhaven']).notNull(),
+    sourceRef: varchar('source_ref', { length: 128 }),
+    glbAssetId: varchar('glb_asset_id', { length: 128 }).notNull(),
+    thumbAssetId: varchar('thumb_asset_id', { length: 128 }),
+    widthMm: decimal('width_mm', { precision: 10, scale: 2 }).notNull(),
+    depthMm: decimal('depth_mm', { precision: 10, scale: 2 }).notNull(),
+    heightMm: decimal('height_mm', { precision: 10, scale: 2 }).notNull(),
+    price: decimal('price', { precision: 15, scale: 2 }),
+    brand: varchar('brand', { length: 255 }),
+    license: varchar('license', { length: 255 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('design_models_user_idx').on(table.userId),
+  })
+)
+
+// Virtual-tour links: a frozen list of renders/panoramas/videos a client can open without an account.
+export const designShares = mysqlTable(
+  'design_shares',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    token: varchar('token', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    message: text('message'),
+    renderIds: json('render_ids').$type<string[]>().notNull(),
+    expiresAt: timestamp('expires_at', { fsp: 3 }),
+    revokedAt: timestamp('revoked_at', { fsp: 3 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex('design_shares_token_idx').on(table.token),
+    projectIdx: index('design_shares_project_idx').on(table.projectId),
+  })
+)

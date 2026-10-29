@@ -31,6 +31,7 @@ Klyent is a client management SaaS platform for freelancers and small businesses
 - **File comments** — Threaded comments on individual files
 - **Dark mode** — Full light/dark theme support
 - **Material Visualizer** — Apply laminate, tile or paint samples to surfaces in a room render with perspective, preserved lighting and server-verified pixel integrity (see below)
+- **3D Designer** — Coohom-style room designer: draw or trace a floor plan (walls, doors, windows, auto-detected rooms), furnish it with parametric wardrobes/kitchens/beds, uploaded GLB models or free CC0 Poly Haven models, apply library finishes, then render path-traced stills (up to 4K), 360° panoramas and walkthrough videos in the browser, share a no-login virtual tour link and turn the BOM into a cost-breakup proposal
 - **Procurement** — Vendor price lists, side-by-side quote comparison per requirement, GST purchase orders with vendor share links, delivery and payment tracking, and project margins (see below)
 
 ## Project Structure

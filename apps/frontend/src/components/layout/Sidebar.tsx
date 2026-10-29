@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, CreditCard, FolderOpen, LogOut, Moon, Sun, Layers, X, Briefcase, FileText, Receipt, Sparkles, Bot, PaintRoller, ShoppingCart } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, FolderOpen, LogOut, Moon, Sun, Layers, X, Briefcase, FileText, Receipt, Sparkles, Bot, PaintRoller, ShoppingCart, Box } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ const navItems = [
   { to: '/ai', label: 'AI', icon: Bot },
   { to: '/studio', label: 'AI Studio', icon: Sparkles },
   { to: '/visualizer', label: 'Visualizer', icon: PaintRoller },
+  { to: '/designer', label: '3D Designer', icon: Box },
 ]
 
 interface SidebarProps {

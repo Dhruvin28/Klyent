@@ -54,6 +54,13 @@ export const config = {
     maxPixels: 25_000_000,
     maxTextureSide: 4096,
   },
+  designer: {
+    // Walkthrough videos and GLB models are larger than render images.
+    maxAssetSize: 80 * 1024 * 1024,
+    maxPlanBytes: 3 * 1024 * 1024,
+    // Total download cap when packing a Poly Haven model.
+    maxImportBytes: 60 * 1024 * 1024,
+  },
   studioUpload: {
     maxSize: 50 * 1024 * 1024, // 50MB — documents/media
     maxImportSize: 200 * 1024 * 1024, // 200MB — WhatsApp export zips can be large with media
