@@ -143,7 +143,7 @@ export function InteriorWorkspacePage() {
         )}
       </div>
 
-      {tab === 'drawings' && <DrawingsTab summary={summary} roomNames={roomNames} onOpenPage={(pid) => (setPageId(pid), setHighlight(null), setTab('review'))} />}
+      {tab === 'drawings' && <DrawingsTab summary={summary} roomNames={roomNames} onOpenPage={(pid) => (setPageId(pid), setHighlight(null), setTab('review'))} onBuilt={() => (setPinned(false), setTab('model'))} />}
       {tab === 'review' && <ReviewTab summary={summary} pageId={pageId} setPageId={(pid) => (setPageId(pid), setHighlight(null))} registrations={revision?.scene.registrations ?? []} highlight={highlight} />}
       {needsRevision &&
         (!revisionId ? (

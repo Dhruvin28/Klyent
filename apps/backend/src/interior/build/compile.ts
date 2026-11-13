@@ -101,7 +101,9 @@ export async function compileScene(input: CompileInput): Promise<SceneDoc> {
     role: page.role, title: page.title, calibration, interpretation: page.interpretationMeta,
   }))
   const ref = calibrated.find((x) => x.page.pageId === input.referencePageId && x.page.interpretation && x.calibration.mmPerPx)
-    ?? calibrated.find((x) => x.page.role === 'floor_plan' && x.page.interpretation && x.calibration.mmPerPx)
+    ?? (['floor_plan', 'furniture_layout', 'reflected_ceiling_plan', 'electrical_plan'] as const)
+      .map((role) => calibrated.find((x) => x.page.role === role && x.page.interpretation?.walls.length && x.calibration.mmPerPx))
+      .find(Boolean)
   const offsets = new Map<string, Pt>()
   for (const { page, calibration } of calibrated) {
     if (!page.interpretation || !calibration.mmPerPx || !PLAN_VIEW_ROLES.has(page.role)) continue

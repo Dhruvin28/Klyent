@@ -62,6 +62,7 @@ export const interiorApi = {
   reinterpretPage: async (id: string) => (await api.post<{ data: { jobId: string } }>(`/interior/pages/${id}/interpret`)).data.data,
 
   build: async (id: string) => (await api.post<{ data: { jobId: string } }>(`/interior/workspaces/${id}/build`, {}, { headers: { 'Idempotency-Key': crypto.randomUUID() } })).data.data,
+  getJob: async (id: string) => (await api.get<{ data: { id: string; status: string; error: string | null; errorCode: string | null; result: { revisionId?: string; walls?: number; rooms?: number } | null } }>(`/interior/jobs/${id}`)).data.data,
   cancelJob: async (id: string) => {
     await api.post(`/interior/jobs/${id}/cancel`)
   },

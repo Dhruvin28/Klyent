@@ -12,7 +12,7 @@ import { PAGE_ROLES, PLAN_VIEW_ROLES, ROLE_LABEL, type InteriorJob, type PageMet
 
 const ACCEPT = '.pdf,.dxf,.png,.jpg,.jpeg,.webp,.tif,.tiff'
 
-export function DrawingsTab({ summary, roomNames, onOpenPage }: { summary: WorkspaceSummary; roomNames: string[]; onOpenPage: (id: string) => void }) {
+export function DrawingsTab({ summary, roomNames, onOpenPage, onBuilt }: { summary: WorkspaceSummary; roomNames: string[]; onOpenPage: (id: string) => void; onBuilt?: () => void }) {
   const ws = summary.workspace
   const qc = useQueryClient()
   const { toast } = useToast()
@@ -51,6 +51,35 @@ export function DrawingsTab({ summary, roomNames, onOpenPage }: { summary: Works
   const activeJobs = summary.jobs.filter((j) => ['queued', 'running', 'retry_wait'].includes(j.status))
   const failedJobs = summary.jobs.filter((j) => j.status === 'failed' && !summary.jobs.some((k) => k.targetId === j.targetId && k.type === j.type && new Date(k.createdAt) > new Date(j.createdAt)))
   const building = activeJobs.some((j) => j.type === 'build_scene')
+  const [starting, setStarting] = useState(false)
+  const runBuild = async () => {
+    setStarting(true)
+    try {
+      const { jobId } = await interiorApi.build(ws.id)
+      toast({ title: 'Building the 3D scene…' })
+      await refresh()
+      for (let i = 0; i < 120; i++) {
+        const j = await interiorApi.getJob(jobId)
+        if (j.status === 'succeeded') {
+          await refresh()
+          toast({ title: '3D model built', description: `${j.result?.walls ?? 0} walls, ${j.result?.rooms ?? 0} rooms. Opening the model.` })
+          onBuilt?.()
+          return
+        }
+        if (j.status === 'failed' || j.status === 'canceled') {
+          await refresh()
+          toast({ title: `Build ${j.status}`, description: j.error ?? undefined, variant: 'destructive' })
+          return
+        }
+        await new Promise((r) => setTimeout(r, 1000))
+      }
+      toast({ title: 'Build is taking longer than expected', description: 'It is still running; check back shortly.' })
+    } catch (err) {
+      toast({ title: 'Build failed to start', description: apiErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setStarting(false)
+    }
+  }
   const planPages = summary.pages.filter((p) => PLAN_VIEW_ROLES.has(p.effectiveRole) && p.status !== 'excluded')
 
   return (
@@ -162,8 +191,8 @@ export function DrawingsTab({ summary, roomNames, onOpenPage }: { summary: Works
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <input type="checkbox" checked={ws.autoBuild} onChange={(e) => act(() => interiorApi.updateWorkspace(ws.id, { autoBuild: e.target.checked }))} /> Build automatically
               </label>
-              <Button size="sm" className="gap-1.5" disabled={building || !summary.pages.some((p) => p.interpretationKey)} onClick={() => act(() => interiorApi.build(ws.id), 'Building the 3D scene')}>
-                {building ? <Loader2 className="h-4 w-4 animate-spin" /> : <Hammer className="h-4 w-4" />} Build 3D model
+              <Button size="sm" className="gap-1.5" disabled={building || starting || !summary.pages.some((p) => p.interpretationKey)} onClick={runBuild}>
+                {building || starting ?<Loader2 className="h-4 w-4 animate-spin" /> : <Hammer className="h-4 w-4" />} Build 3D model
               </Button>
             </div>
           </div>
@@ -173,7 +202,7 @@ export function DrawingsTab({ summary, roomNames, onOpenPage }: { summary: Works
                 key={p.id}
                 page={p}
                 job={jobFor('interpret_page', p.id)}
-                isReference={ws.referencePageId === p.id || (!ws.referencePageId && planPages[0]?.id === p.id && p.effectiveRole === 'floor_plan')}
+                isReference={ws.referencePageId === p.id || (!ws.referencePageId && (planPages.find((x) => x.effectiveRole === 'floor_plan') ?? planPages[0])?.id === p.id)}
                 roomNames={roomNames}
                 onOpen={() => onOpenPage(p.id)}
                 onUpdate={(body, ok) => act(() => interiorApi.updatePage(p.id, body), ok)}
