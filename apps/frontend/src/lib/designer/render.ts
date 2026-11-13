@@ -56,6 +56,13 @@ export interface TraceJob {
   height: number
   samples: number
   pose: CameraPose
+  /** Orthographic frustum (metres) for elevations, top and isometric views. */
+  ortho?: { width: number; height: number } | null
+  up?: [number, number, number]
+  /** Visualisation preset applied after the camera's automatic cutaway. */
+  preset?: { items?: boolean; ceilings?: 'auto' | 'show' | 'hide' }
+  /** Flip horizontally (reflected-ceiling convention). */
+  mirrorX?: boolean
 }
 
 export interface TraceHandle {
@@ -104,14 +111,24 @@ export function pathTrace(plan: Plan, ctx: SceneContext, job: TraceJob, onProgre
       const eq = new EquirectCamera()
       eq.position.copy(job.pose.position)
       camera = eq
+    } else if (job.ortho) {
+      const { width: w, height: h } = job.ortho
+      const oc = new THREE.OrthographicCamera(-w / 2, w / 2, h / 2, -h / 2, 0.001, 500)
+      oc.position.copy(job.pose.position)
+      if (job.up) oc.up.set(...job.up)
+      oc.lookAt(job.pose.target)
+      oc.updateProjectionMatrix()
+      camera = oc
     } else {
       const pc = new THREE.PerspectiveCamera(job.pose.fov, job.width / job.height, 0.05, 500)
       pc.position.copy(job.pose.position)
+      if (job.up) pc.up.set(...job.up)
       pc.lookAt(job.pose.target)
       camera = pc
     }
     camera.updateMatrixWorld()
     ds.applyCamera(camera)
+    if (job.preset) ds.applyPreset(job.preset)
     ds.scene.updateMatrixWorld(true)
 
     tracer = new WebGLPathTracer(renderer)
@@ -156,8 +173,18 @@ export function pathTrace(plan: Plan, ctx: SceneContext, job: TraceJob, onProgre
       requestAnimationFrame(tick)
     })
 
+    let out: HTMLCanvasElement = canvas
+    if (job.mirrorX) {
+      out = document.createElement('canvas')
+      out.width = canvas.width
+      out.height = canvas.height
+      const c2 = out.getContext('2d')!
+      c2.translate(out.width, 0)
+      c2.scale(-1, 1)
+      c2.drawImage(canvas, 0, 0)
+    }
     return new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode the render'))), 'image/jpeg', 0.92)
+      out.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode the render'))), 'image/jpeg', 0.92)
     )
   })().finally(cleanup)
 

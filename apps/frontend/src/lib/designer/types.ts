@@ -119,6 +119,52 @@ export interface Underlay {
   visible: boolean
 }
 
+/** Dropped / POP ceiling: the area between `outer` and `inner` (or all of `outer`) sits at `level`. */
+export interface CeilingZone {
+  id: string
+  name: string
+  roomId: string | null
+  outer: Vec2[]
+  /** Raised tray left open inside the drop (null = flat drop over the whole outline). */
+  inner: Vec2[] | null
+  /** Finished underside of the dropped part, mm above the floor. */
+  level: number
+  cove: { width: number; kelvin: number } | null
+  material: MatRef | null
+}
+
+/** Wall paneling on one face of a wall, in wall-local mm measured from wall.a. */
+export interface WallPanel {
+  id: string
+  name: string
+  wallId: string
+  side: 'left' | 'right'
+  start: number
+  length: number
+  bottom: number
+  height: number
+  depth: number
+  divisions: number
+  groove: number
+  material: MatRef | null
+}
+
+export const FIXTURE_KINDS = ['downlight', 'spot', 'pendant', 'chandelier', 'wall_light', 'strip', 'fan'] as const
+export type FixtureKind = (typeof FIXTURE_KINDS)[number]
+
+export interface Fixture {
+  id: string
+  name: string
+  kind: FixtureKind
+  x: number
+  y: number
+  /** Height of the emitting face above the floor; null = flush with the ceiling above it. */
+  mount: number | null
+  size: number
+  kelvin: number
+  on: boolean
+}
+
 export interface Plan {
   version: 1
   wallHeight: number
@@ -129,6 +175,10 @@ export interface Plan {
   lighting: Lighting
   cameras: SavedCamera[]
   underlay: Underlay | null
+  /** Interior 3D detail families (optional; created from drawings). */
+  ceilings?: CeilingZone[]
+  panels?: WallPanel[]
+  fixtures?: Fixture[]
 }
 
 // ── API records ──────────────────────────────────────────────────────────

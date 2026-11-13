@@ -61,6 +61,32 @@ export const config = {
     // Total download cap when packing a Poly Haven model.
     maxImportBytes: 60 * 1024 * 1024,
   },
+  // Interior 3D — dimension-preserving drawing → 3D reconstruction.
+  interior: {
+    enabled: (process.env.INTERIOR_ENABLED ?? 'true') !== 'false',
+    // Strongest available reasoning + vision model; interpretation is evidence-bound and
+    // every geometric result is re-checked deterministically, so the model never decides
+    // authoritative dimensions on its own.
+    model: process.env.INTERIOR_OPENAI_INTERPRETATION_MODEL ?? 'gpt-6-astra',
+    reasoningEffort: process.env.INTERIOR_OPENAI_REASONING_EFFORT ?? 'high',
+    maxOutputTokens: parseInt(process.env.INTERIOR_OPENAI_MAX_OUTPUT_TOKENS ?? '64000'),
+    requestTimeoutMs: parseInt(process.env.INTERIOR_OPENAI_TIMEOUT_MS ?? String(20 * 60 * 1000)),
+    // Per-job token budget (input + output). A job over budget stops for review.
+    maxTokensPerJob: parseInt(process.env.INTERIOR_MAX_TOKENS_PER_JOB ?? '400000'),
+    maxUploadBytes: parseInt(process.env.INTERIOR_MAX_UPLOAD_BYTES ?? String(60 * 1024 * 1024)),
+    maxRasterBytes: 30 * 1024 * 1024,
+    maxPdfPages: 40,
+    maxPagesPerWorkspace: 120,
+    maxDecodedPixels: 100_000_000,
+    // Stored page raster (long side) and the image sent to the model.
+    pageLongSide: 3200,
+    previewLongSide: 2048,
+    maxVectorSegments: 250_000,
+    maxTextTokensToModel: 1800,
+    workerConcurrency: parseInt(process.env.INTERIOR_WORKER_CONCURRENCY ?? '2'),
+    leaseSeconds: parseInt(process.env.INTERIOR_WORKER_LEASE_SECONDS ?? '300'),
+    sceneSchemaVersion: 'interior-scene/1',
+  },
   studioUpload: {
     maxSize: 50 * 1024 * 1024, // 50MB — documents/media
     maxImportSize: 200 * 1024 * 1024, // 200MB — WhatsApp export zips can be large with media

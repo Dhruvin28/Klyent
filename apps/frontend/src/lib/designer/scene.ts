@@ -17,7 +17,7 @@ import {
 } from './geometry'
 import { MaterialResolver } from './materials'
 import { buildParametric } from './parametric'
-import type { DesignModel, Item, Opening, Plan, Room, Vec2, Wall } from './types'
+import type { CeilingZone, DesignModel, Fixture, Item, Opening, Plan, Room, Vec2, Wall, WallPanel } from './types'
 
 const MM = 0.001
 
@@ -133,6 +133,8 @@ export class DesignScene {
   private walls: WallInfo[] = []
   private ceilings: THREE.Object3D[] = []
   private itemGroups = new Map<string, THREE.Object3D>()
+  /** Furniture only (hidden by the reflected-ceiling preset). */
+  private furniture: THREE.Object3D[] = []
   private pending: Promise<unknown>[] = []
   private sky: GradientEquirectTexture | null = null
   private selectionHelper: THREE.BoxHelper | null = null
@@ -172,6 +174,11 @@ export class DesignScene {
       if (w) this.buildOpeningFill(w, o, plan)
     }
     for (const r of plan.rooms) this.buildRoom(r, plan)
+    for (const z of plan.ceilings ?? []) this.buildCeilingZone(z, plan)
+    for (const p of plan.panels ?? []) {
+      const w = wallsById.get(p.wallId)
+      if (w) this.buildPanel(p, w)
+    }
     for (const it of plan.items) this.buildItem(it)
     this.buildLights(plan)
 
@@ -189,6 +196,16 @@ export class DesignScene {
     }
     const inside = p.y < this.wallHeight - 0.05
     for (const c of this.ceilings) c.visible = inside
+  }
+
+  /**
+   * Visualisation preset for a view (after applyCamera): hides furniture or ceilings
+   * without changing the model; hidden things are listed in the view's note.
+   */
+  applyPreset(preset: { items?: boolean; ceilings?: 'auto' | 'show' | 'hide' }) {
+    if (preset.items === false) for (const f of this.furniture) f.visible = false
+    if (preset.ceilings === 'hide') for (const c of this.ceilings) c.visible = false
+    if (preset.ceilings === 'show') for (const c of this.ceilings) c.visible = true
   }
 
   /** Shows every wall and ceiling (for path-traced renders from inside a room). */
@@ -235,6 +252,7 @@ export class DesignScene {
     this.scene.add(this.content)
     this.walls = []
     this.ceilings = []
+    this.furniture = []
     this.itemGroups.clear()
     this.pending = []
   }
@@ -439,6 +457,181 @@ export class DesignScene {
     }
     this.content.add(g)
     this.itemGroups.set(it.id, g)
+    this.furniture.push(g)
+  }
+
+  /** POP / dropped ceiling: underside at `level`, fascia up to the main ceiling, optional cove. */
+  private buildCeilingZone(z: CeilingZone, plan: Plan) {
+    if (z.outer.length < 3) return
+    const lib = this.ctx.library
+    const y = z.level * MM
+    const top = plan.wallHeight * MM
+    const mat = lib.get(z.material ?? DEFAULT_FINISH.ceiling, DEFAULT_FINISH.ceiling)
+    const target: PickTarget | null = z.roomId ? { kind: 'ceiling', id: z.roomId } : null
+    const shape = new THREE.Shape(z.outer.map((p) => new THREE.Vector2(p.x * MM, p.y * MM)))
+    if (z.inner && z.inner.length >= 3) shape.holes.push(new THREE.Path(z.inner.map((p) => new THREE.Vector2(p.x * MM, p.y * MM))))
+    const under = faceFromShape(shape, new THREE.Vector3(0, y, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1))
+    const meshes: THREE.Object3D[] = [tagMesh(under, mat, target, false)]
+    // Vertical fascia from the drop up to the main ceiling, facing away from the solid part.
+    const fascia = new QuadBuilder()
+    const loopFaces = (loop: Vec2[], solidInside: boolean) => {
+      for (let i = 0; i < loop.length; i++) {
+        const a = loop[i]
+        const b = loop[(i + 1) % loop.length]
+        const L = Math.hypot(b.x - a.x, b.y - a.y)
+        if (L < 1) continue
+        let n = { x: (b.y - a.y) / L, y: -(b.x - a.x) / L }
+        const probe = { x: (a.x + b.x) / 2 + n.x * 10, y: (a.y + b.y) / 2 + n.y * 10 }
+        // The normal must point out of the solid drop region.
+        if (pointInPolygon(probe, loop) === solidInside) n = { x: -n.x, y: -n.y }
+        const N = new THREE.Vector3(n.x, 0, n.y)
+        fascia.quad([toWorld(a, y), toWorld(b, y), toWorld(b, top - 0.001), toWorld(a, top - 0.001)], N, [L * MM, top - y])
+      }
+    }
+    if (top - y > 0.005) {
+      if (z.inner && z.inner.length >= 3) loopFaces(z.inner, false)
+      else loopFaces(z.outer, true)
+      meshes.push(tagMesh(fascia.build(), mat, target, false))
+    }
+    // Cove: a hidden upward-facing LED strip on top of the drop, washing the tray ceiling.
+    if (z.cove && z.inner && z.inner.length >= 3) {
+      const strip = new QuadBuilder()
+      const w = Math.min(0.08, z.cove.width * MM)
+      const loop = z.inner
+      for (let i = 0; i < loop.length; i++) {
+        const a = loop[i]
+        const b = loop[(i + 1) % loop.length]
+        const L = Math.hypot(b.x - a.x, b.y - a.y)
+        if (L < 1) continue
+        let n = { x: (b.y - a.y) / L, y: -(b.x - a.x) / L }
+        if (pointInPolygon({ x: (a.x + b.x) / 2 + n.x * 10, y: (a.y + b.y) / 2 + n.y * 10 }, loop)) n = { x: -n.x, y: -n.y }
+        const off = { x: n.x * w * 1000, y: n.y * w * 1000 }
+        const yy = y + 0.04
+        strip.quad([toWorld(a, yy), toWorld(b, yy), toWorld({ x: b.x + off.x, y: b.y + off.y }, yy), toWorld({ x: a.x + off.x, y: a.y + off.y }, yy)], new THREE.Vector3(0, 1, 0), [L * MM, w])
+      }
+      const lightOn = plan.lighting.ceilingLights || LIGHTING_LOOKS[plan.lighting.preset].forceLights
+      const m = new THREE.Mesh(strip.build(), lightOn ? lib.emissive(kelvinToHex(z.cove.kelvin)) : mat)
+      m.castShadow = false
+      meshes.push(m)
+    }
+    for (const m of meshes) {
+      this.content.add(m)
+      this.ceilings.push(m)
+    }
+    this.itemGroups.set(z.id, meshes[0])
+  }
+
+  /** Wall paneling: equal boards separated by grooves, standing proud of the wall face. */
+  private buildPanel(p: WallPanel, w: Wall) {
+    const L = wallLength(w)
+    if (L < 1 || p.length < 1) return
+    const lib = this.ctx.library
+    const d2 = wallDir(w)
+    const n2 = wallLeftNormal(w)
+    const sign = p.side === 'left' ? 1 : -1
+    const g = new THREE.Group()
+    const n = Math.max(1, Math.round(p.divisions))
+    const groove = n > 1 ? Math.min(p.groove, p.length / n / 2) : 0
+    const boardW = (p.length - groove * (n - 1)) / n
+    const mat = lib.get(p.material ?? { kind: 'color', hex: '#8b6a4f', roughness: 0.55 }, DEFAULT_FINISH.trim)
+    for (let i = 0; i < n; i++) {
+      const u = p.start + i * (boardW + groove) + boardW / 2
+      const off = sign * (w.thickness / 2 + p.depth / 2)
+      const c = { x: w.a.x + d2.x * u + n2.x * off, y: w.a.y + d2.y * u + n2.y * off }
+      const geo = new THREE.BoxGeometry(boardW * MM, p.height * MM, p.depth * MM)
+      const m = tagMesh(geo, mat, { kind: 'wall', id: w.id, side: p.side })
+      m.position.copy(toWorld(c, (p.bottom + p.height / 2) * MM))
+      m.rotation.y = -Math.atan2(d2.y, d2.x)
+      g.add(m)
+    }
+    this.content.add(g)
+    this.itemGroups.set(p.id, g)
+  }
+
+  /** Ceiling height above a plan point (a drop zone lowers it). */
+  private ceilingAt(plan: Plan, p: Vec2) {
+    for (const z of plan.ceilings ?? []) {
+      if (pointInPolygon(p, z.outer) && !(z.inner && pointInPolygon(p, z.inner))) return z.level
+    }
+    return plan.wallHeight
+  }
+
+  private buildFixture(f: Fixture, plan: Plan, lightsOn: boolean, budget: { lights: number }) {
+    const lib = this.ctx.library
+    const hex = kelvinToHex(f.kelvin)
+    const ceil = this.ceilingAt(plan, f) * MM
+    const g = new THREE.Group()
+    const r = (f.size * MM) / 2
+    const on = lightsOn && f.on
+    const emit = on ? lib.emissive(hex) : lib.get({ kind: 'color', hex: '#f4f1ea', roughness: 0.4 }, DEFAULT_FINISH.trim)
+    const metal = lib.get({ kind: 'color', hex: '#2b2b2e', roughness: 0.4, metalness: 0.8 }, DEFAULT_FINISH.frame)
+    let lightY = ceil - 0.05
+    const add = (geo: THREE.BufferGeometry, m: THREE.Material, y: number) => {
+      const mesh = new THREE.Mesh(geo, m)
+      mesh.position.y = y
+      mesh.castShadow = false
+      g.add(mesh)
+      return mesh
+    }
+    switch (f.kind) {
+      case 'downlight':
+      case 'spot':
+        add(new THREE.CylinderGeometry(r, r, 0.012, 24), emit, ceil - 0.006)
+        break
+      case 'pendant': {
+        const drop = f.mount !== null ? f.mount * MM : ceil - 0.7
+        add(new THREE.CylinderGeometry(0.004, 0.004, Math.max(0.01, ceil - drop), 6), metal, (ceil + drop) / 2)
+        add(new THREE.ConeGeometry(r, r * 0.9, 24, 1, true), metal, drop + r * 0.45)
+        add(new THREE.SphereGeometry(r * 0.35, 16, 12), emit, drop + r * 0.2)
+        lightY = drop
+        break
+      }
+      case 'chandelier': {
+        const drop = f.mount !== null ? f.mount * MM : ceil - 0.6
+        add(new THREE.CylinderGeometry(0.004, 0.004, Math.max(0.01, ceil - drop), 6), metal, (ceil + drop) / 2)
+        add(new THREE.SphereGeometry(r * 0.6, 20, 16), emit, drop)
+        lightY = drop
+        break
+      }
+      case 'wall_light': {
+        const y = (f.mount ?? 1800) * MM
+        add(new THREE.BoxGeometry(0.12, 0.2, 0.08), emit, y)
+        lightY = y
+        break
+      }
+      case 'strip':
+        add(new THREE.BoxGeometry(f.size * MM, 0.012, 0.03), emit, ceil - 0.006)
+        break
+      case 'fan': {
+        add(new THREE.CylinderGeometry(0.09, 0.09, 0.12, 20), metal, ceil - 0.25)
+        const wood = lib.get({ kind: 'color', hex: '#6b4a33', roughness: 0.6 }, DEFAULT_FINISH.trim)
+        for (let k = 0; k < 3; k++) {
+          const ang = (k * Math.PI * 2) / 3
+          const b = add(new THREE.BoxGeometry(r * 0.9, 0.008, 0.11), wood, ceil - 0.3)
+          b.rotation.y = ang
+          b.position.x = Math.cos(ang) * r * 0.5
+          b.position.z = -Math.sin(ang) * r * 0.5
+        }
+        break
+      }
+    }
+    g.position.copy(toWorld(f, 0))
+    this.content.add(g)
+    this.itemGroups.set(f.id, g)
+    // Flush ceiling fixtures disappear with the ceiling in top views.
+    if (f.kind !== 'wall_light' && f.kind !== 'pendant' && f.kind !== 'chandelier') this.ceilings.push(g)
+    else this.furniture.push(g)
+    // Real emitters for the first N fixtures (raster preview cost); the rest only glow.
+    if (on && f.kind !== 'fan' && budget.lights > 0) {
+      budget.lights--
+      const light = f.kind === 'spot' ? new THREE.SpotLight(hex, 60, 0, Math.PI / 7, 0.4, 2) : new THREE.PointLight(hex, f.kind === 'strip' ? 25 : f.kind === 'chandelier' ? 90 : 40, 0, 2)
+      light.position.copy(toWorld(f, lightY))
+      if (light instanceof THREE.SpotLight) {
+        light.target.position.copy(toWorld(f, 0))
+        this.content.add(light.target)
+      }
+      this.content.add(light)
+    }
   }
 
   private buildLights(plan: Plan) {
@@ -458,12 +651,18 @@ export class DesignScene {
     this.sun.intensity = look.sunIntensity
     this.sun.visible = look.sunIntensity > 0
 
-    if (!(plan.lighting.ceilingLights || look.forceLights)) return
+    const lightsOn = plan.lighting.ceilingLights || look.forceLights
+    // Fixtures from drawings replace the automatic panel grid in the rooms that have them.
+    const fixtures = plan.fixtures ?? []
+    const budget = { lights: 40 }
+    for (const f of fixtures) this.buildFixture(f, plan, lightsOn, budget)
+    if (!lightsOn) return
     const hex = kelvinToHex(plan.lighting.lightTemp)
     const y = plan.wallHeight * MM - 0.01
     for (const r of plan.rooms) {
       const pts = roomInnerPolygon(r, plan.walls)
       if (pts.length < 3) continue
+      if (fixtures.some((f) => pointInPolygon(f, pts))) continue
       // One panel per ~2.4 m grid cell inside the room.
       const xs = pts.map((p) => p.x)
       const ys = pts.map((p) => p.y)

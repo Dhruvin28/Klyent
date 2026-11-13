@@ -8,7 +8,7 @@ if (!process.env.DATABASE_URL) {
 const url = new URL(process.env.DATABASE_URL)
 
 export default defineConfig({
-  schema: './src/db/schema.ts',
+  schema: ['./src/db/schema.ts', './src/db/interiorSchema.ts'],
   out: './drizzle',
   dialect: 'mysql',
   dbCredentials: {

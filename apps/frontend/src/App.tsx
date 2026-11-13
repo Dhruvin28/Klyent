@@ -41,6 +41,9 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 const DesignerPage = lazy(() => import('@/pages/designer/DesignerPage').then((m) => ({ default: m.DesignerPage })))
 const DesignerEditorPage = lazy(() => import('@/pages/designer/DesignerEditorPage').then((m) => ({ default: m.DesignerEditorPage })))
 const DesignerTourPage = lazy(() => import('@/pages/designer/DesignerTourPage').then((m) => ({ default: m.DesignerTourPage })))
+// Interior 3D reuses the designer's three.js renderer; load it on demand too.
+const InteriorPage = lazy(() => import('@/pages/interior/InteriorPage').then((m) => ({ default: m.InteriorPage })))
+const InteriorWorkspacePage = lazy(() => import('@/pages/interior/InteriorWorkspacePage').then((m) => ({ default: m.InteriorWorkspacePage })))
 const lazyPage = (el: JSX.Element) => <Suspense fallback={<LoadingSpinner />}>{el}</Suspense>
 
 export default function App() {
@@ -89,6 +92,8 @@ export default function App() {
           <Route path="/visualizer/:id" element={<VisualizerEditorPage />} />
           <Route path="/designer" element={lazyPage(<DesignerPage />)} />
           <Route path="/designer/:id" element={lazyPage(<DesignerEditorPage />)} />
+          <Route path="/interior" element={lazyPage(<InteriorPage />)} />
+          <Route path="/interior/:id" element={lazyPage(<InteriorWorkspacePage />)} />
         </Route>
 
         {/* Catch-all redirect */}

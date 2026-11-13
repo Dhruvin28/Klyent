@@ -22,6 +22,7 @@ import visualizerRoutes from './routes/visualizer'
 import visualizerPublicRoutes from './routes/visualizer/public'
 import designerRoutes from './routes/designer'
 import designerPublicRoutes from './routes/designer/public'
+import interiorRoutes from './routes/interior'
 import studioProjectRoutes from './routes/studio/projects'
 import studioGroupRoutes from './routes/studio/groups'
 import studioMessageRoutes from './routes/studio/messages'
@@ -129,6 +130,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   // 3D Designer — floor plans, furniture catalog, renders and virtual-tour links
   await app.register(designerRoutes, { prefix: '/api/designer' })
   await app.register(designerPublicRoutes, { prefix: '/api/designer-public' })
+
+  // Interior 3D — dimension-preserving drawings → validated 3D scene → multi-view renders
+  await app.register(interiorRoutes, { prefix: '/api/interior' })
 
   // Studio AI — WhatsApp project knowledge engine
   await app.register(studioProjectRoutes, { prefix: '/api/studio/projects' })

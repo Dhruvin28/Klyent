@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, FileText, Loader2, MessageSquarePlus, Paperclip, Send, Sparkles, Trash2, X, PanelLeft } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Download, FileText, Loader2, MessageSquarePlus, Paperclip, Ruler, Send, Sparkles, Trash2, X, PanelLeft } from 'lucide-react'
 import { aiApi, type AiAttachment, type AiMessage } from '@/api/ai'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -331,6 +332,18 @@ export function AiPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-5">
+          <Link
+            to="/interior"
+            className="mb-4 flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm hover:bg-primary/10"
+          >
+            <Ruler className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span>
+              <span className="font-medium">Need renders that match the drawings to the millimetre?</span>{' '}
+              <span className="text-muted-foreground">
+                Images generated here are artistic impressions. Interior 3D builds a validated 3D model from your plans, elevations and ceiling plans, then renders every view from that exact model.
+              </span>
+            </span>
+          </Link>
           {notConfigured && (
             <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
               AI is not configured. Set <code>OPENAI_API_KEY</code> in the backend <code>.env</code> and restart the server.
