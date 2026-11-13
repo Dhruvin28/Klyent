@@ -18,6 +18,11 @@ type Quality = keyof typeof QUALITY
 const SIZES = [1280, 1920, 2560, 3840]
 const GROUP_LABEL: Record<ViewSpec['group'], string> = { perspective: 'Perspectives', elevation: 'Elevations', top: 'Top cutaway', ceiling: 'Reflected ceiling', isometric: 'Isometric' }
 
+// View specs are in plan space (mm, x/y on the floor, z up); the scene is in metres with y up
+// and plan y on world z, exactly like toWorld() in the designer scene.
+const MM = 0.001
+const toWorldVec = ([x, y, z]: [number, number, number]) => new THREE.Vector3(x * MM, z * MM, y * MM)
+
 interface Progress {
   set: RenderSet
   index: number
@@ -84,9 +89,9 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
             width,
             height,
             samples: set.manifest.quality.samples,
-            pose: { position: new THREE.Vector3(...view.position), target: new THREE.Vector3(...view.target), fov: view.fov },
-            ortho: view.projection === 'orthographic' ? view.ortho : null,
-            up: view.up,
+            pose: { position: toWorldVec(view.position), target: toWorldVec(view.target), fov: view.fov },
+            ortho: view.projection === 'orthographic' && view.ortho ? { width: view.ortho.width * MM, height: view.ortho.height * MM } : null,
+            up: view.up ? ([view.up[0], view.up[2], view.up[1]] as [number, number, number]) : undefined,
             preset: view.visibility,
             mirrorX: view.mirrorX,
           },
