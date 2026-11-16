@@ -84,7 +84,7 @@ export const interiorApi = {
   decisions: async (workspaceId: string) => (await api.get<{ data: Decision[] }>(`/interior/workspaces/${workspaceId}/decisions`)).data.data,
   report: async (revisionId: string) => (await api.get<{ data: Report }>(`/interior/revisions/${revisionId}/report`)).data.data,
 
-  createRenderSet: async (revisionId: string, body: { viewKeys: string[]; quality: 'draft' | 'presentation' | 'high_resolution'; longSide: number; allowDraft: boolean }) =>
+  createRenderSet: async (revisionId: string, body: { viewKeys: string[]; quality: 'draft' | 'presentation' | 'high_resolution'; longSide: number; allowDraft: boolean; rerun?: boolean }) =>
     (await api.post<{ data: RenderSet }>(`/interior/revisions/${revisionId}/render-sets`, body)).data.data,
   listRenderSets: async (workspaceId: string) => (await api.get<{ data: RenderSet[] }>(`/interior/workspaces/${workspaceId}/render-sets`)).data.data,
   uploadRenderOutput: async (setId: string, viewKey: string, blob: Blob, width: number, height: number) => {

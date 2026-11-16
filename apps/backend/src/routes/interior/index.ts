@@ -523,7 +523,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
   app.post('/revisions/:id/render-sets', async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z
-      .object({ viewKeys: z.array(z.string().min(1).max(200)).min(1).max(80), quality: z.enum(['draft', 'presentation', 'high_resolution']), longSide: z.number().int().min(640).max(4096), allowDraft: z.boolean().default(false) })
+      .object({ viewKeys: z.array(z.string().min(1).max(200)).min(1).max(80), quality: z.enum(['draft', 'presentation', 'high_resolution']), longSide: z.number().int().min(640).max(4096), allowDraft: z.boolean().default(false), rerun: z.boolean().default(false) })
       .parse(request.body)
     const rev = await ownedRevision(uid(request), id)
     let ws = await ownedWorkspace(uid(request), rev.workspaceId)
@@ -556,7 +556,8 @@ export default async function interiorRoutes(app: FastifyInstance) {
       lighting: scene.plan.lighting,
       views,
     }
-    const manifestHash = createHash('sha256').update(stableStringify(manifest)).digest('hex')
+    // An explicit re-run must produce a new set even when nothing in the manifest changed.
+    const manifestHash = createHash('sha256').update(stableStringify(body.rerun ? { ...manifest, rerunNonce: crypto.randomUUID() } : manifest)).digest('hex')
     const [existing] = await db.select().from(intRenderSets).where(and(eq(intRenderSets.workspaceId, ws.id), eq(intRenderSets.manifestHash, manifestHash))).limit(1)
     if (existing) return reply.send({ data: existing })
     const setId = crypto.randomUUID()

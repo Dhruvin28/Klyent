@@ -120,9 +120,10 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
     await qc.invalidateQueries({ queryKey: interiorKeys.renderSets(ws.id) })
   }
 
-  const start = async () => {
+  const start = async (rerunAll = false) => {
     try {
-      const set = await interiorApi.createRenderSet(revision.id, { viewKeys: views.filter((v) => selected.has(v.key)).map((v) => v.key), quality, longSide, allowDraft: !approval || approval.mode !== 'final' })
+      const keys = rerunAll ? views.map((v) => v.key) : views.filter((v) => selected.has(v.key)).map((v) => v.key)
+      const set = await interiorApi.createRenderSet(revision.id, { viewKeys: keys, quality, longSide, allowDraft: !approval || approval.mode !== 'final', rerun: rerunAll })
       await qc.invalidateQueries({ queryKey: interiorKeys.renderSets(ws.id) })
       await qc.invalidateQueries({ queryKey: interiorKeys.workspace(ws.id) })
       await renderSet(set)
@@ -200,9 +201,14 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
               </select>
             </label>
             {!progress ? (
-              <Button className="w-full gap-1.5" disabled={!selected.size} onClick={start}>
-                <Play className="h-4 w-4" /> Render {selected.size} view{selected.size === 1 ? '' : 's'}
-              </Button>
+              <>
+                <Button className="w-full gap-1.5" disabled={!selected.size} onClick={() => start()}>
+                  <Play className="h-4 w-4" /> Render {selected.size} view{selected.size === 1 ? '' : 's'}
+                </Button>
+                <Button variant="outline" className="w-full gap-1.5" disabled={!views.length} onClick={() => start(true)}>
+                  <Play className="h-4 w-4" /> Re-render all {views.length} views (new set)
+                </Button>
+              </>
             ) : (
               <div className="space-y-2">
                 <p className="text-xs">

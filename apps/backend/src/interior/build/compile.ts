@@ -1,3 +1,4 @@
+import { applyDefaultStyling } from './styling'
 import { clampOpeningOffset, findEnclosures, interiorPoint, pointInPolygon, projectToSegment, wallDir, wallLeftNormal, wallLength } from '../../designer/geometry'
 import { defaultPlan, PARAMETRIC_TYPES, planSchema, type ParametricType, type Plan, type Wall } from '../../designer/plan'
 import { parseDimension } from '../dimensions'
@@ -189,6 +190,7 @@ export async function compileScene(input: CompileInput): Promise<SceneDoc> {
     for (const [i, issue] of (page.interpretation?.issues ?? []).entries()) scene.aiIssues.push({ pageId: page.pageId, kind: issue.kind, message: issue.message, region: issue.at ? [issue.at.x, issue.at.y, issue.at.x, issue.at.y] : null })
     for (const [i, kind] of (page.extraction.dxf ? Object.keys(page.extraction.dxf.unsupported) : []).entries()) scene.unsupported.push({ id: objectId(page.pageId, `unsupported-${i + 1}`), pageId: page.pageId, kind, message: `${kind} entities are not reconstructed.` })
   }
+  scene.buildLog.push(...applyDefaultStyling(plan))
   scene.plan = planSchema.parse(plan)
   scene.buildLog.push(`Compiled ${plan.walls.length} walls, ${plan.rooms.length} rooms, ${plan.openings.length} openings and ${plan.items.length} items from ${input.pages.length} page(s).`)
   return scene

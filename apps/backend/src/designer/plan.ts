@@ -12,7 +12,7 @@ const unit = z.number().finite().min(0).max(1)
 const vec2 = z.object({ x: coord, y: coord })
 
 const matRef = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('color'), hex, roughness: unit, metalness: unit.optional() }),
+  z.object({ kind: z.literal('color'), hex, roughness: unit, metalness: unit.optional(), pattern: z.enum(['wood', 'fabric', 'plaster']).optional() }),
   z.object({ kind: z.literal('library'), materialId: id, roughness: unit, rotation: z.number().finite().min(-360).max(360).optional() }),
 ])
 

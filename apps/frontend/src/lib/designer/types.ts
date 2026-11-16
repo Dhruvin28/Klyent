@@ -7,9 +7,11 @@ export interface Vec2 {
   y: number
 }
 
+export type SurfacePattern = 'wood' | 'fabric' | 'plaster'
+
 /** A surface finish: a plain colour, or a texture/paint from the Visualizer material library. */
 export type MatRef =
-  | { kind: 'color'; hex: string; roughness: number; metalness?: number }
+  | { kind: 'color'; hex: string; roughness: number; metalness?: number; pattern?: SurfacePattern }
   | { kind: 'library'; materialId: string; roughness: number; rotation?: number }
 
 export interface Wall {
