@@ -7,7 +7,10 @@ BLENDER_VERSION="${BLENDER_VERSION:-4.2.3}"
 BLENDER_DIR="${BLENDER_DIR:-/home/blender}"
 
 install_blender() {
-  if [ -x "$BLENDER_DIR/blender" ]; then return 0; fi
+  # Complete only if the marker exists AND Blender's bundled Python is present (a restart
+  # mid-extract leaves the binary without its python/ folder).
+  if [ -f "$BLENDER_DIR/.installed" ] && ls "$BLENDER_DIR"/*/python/lib >/dev/null 2>&1; then return 0; fi
+  rm -rf "$BLENDER_DIR"/* "$BLENDER_DIR"/.installed 2>/dev/null
   echo "[startup] installing Blender $BLENDER_VERSION into $BLENDER_DIR"
   mkdir -p "$BLENDER_DIR" /home/tmp
   (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
@@ -20,6 +23,7 @@ install_blender() {
   set -o pipefail
   for attempt in 1 2 3; do
     if curl -fL --retry 3 --retry-delay 5 --connect-timeout 30 "$URL" | tar -xJ -C "$BLENDER_DIR" --strip-components=1; then
+      touch "$BLENDER_DIR/.installed"
       echo "[startup] Blender installed: $("$BLENDER_DIR/blender" --version 2>&1 | head -1)"
       return 0
     fi

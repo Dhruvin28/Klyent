@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { config } from '../../config'
 
@@ -15,19 +15,28 @@ export class RenderError extends Error {
 
 const SCRIPT = [path.join(__dirname, 'blender', 'render_scene.py'), path.resolve(__dirname, '../../../src/interior/render/blender/render_scene.py')].find((p) => existsSync(p)) ?? path.join(__dirname, 'blender', 'render_scene.py')
 
+/** The executable exists and its bundled Python (<dir>/<version>/python) came with it. */
 export function blenderConfigured() {
-  return !!config.interior.render.blenderPath && existsSync(config.interior.render.blenderPath)
+  const exe = config.interior.render.blenderPath
+  if (!exe || !existsSync(exe)) return false
+  try {
+    const dir = path.dirname(exe)
+    return readdirSync(dir).some((d) => /^\d+\.\d+$/.test(d) && existsSync(path.join(dir, d, 'python', 'lib')))
+  } catch {
+    return false
+  }
 }
 
 /** Runs the Cycles render in a headless Blender process and resolves when the PNG exists. */
 export async function runBlender(opts: { sceneJson: string; outPng: string; width: number; height: number; samples: number; onLog?: (line: string) => void; signal?: AbortSignal }): Promise<void> {
   const exe = config.interior.render.blenderPath
   if (!exe) throw new RenderError('BLENDER_NOT_CONFIGURED', 'Server-side rendering needs Blender. Set BLENDER_PATH to the Blender executable on the render worker.')
+  if (!blenderConfigured()) throw new RenderError('BLENDER_INCOMPLETE', 'Blender is still installing or its install is incomplete (bundled Python missing). It retries automatically on the next restart; use Retry in a few minutes.', true)
   if (!existsSync(exe)) throw new RenderError('BLENDER_NOT_FOUND', `BLENDER_PATH does not exist: ${exe}`)
   if (!existsSync(SCRIPT)) throw new RenderError('BLENDER_SCRIPT_MISSING', `Render script not found at ${SCRIPT}`)
   const args = ['-b', '--factory-startup', '-noaudio', '-P', SCRIPT, '--', opts.sceneJson, opts.outPng, String(opts.width), String(opts.height), String(opts.samples), String(config.interior.render.blenderThreads)]
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(exe, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, BLENDER_DEVICE: config.interior.render.blenderDevice } })
+    const child = spawn(exe, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, PYTHONHOME: '', PYTHONPATH: '', BLENDER_DEVICE: config.interior.render.blenderDevice } })
     const tail: string[] = []
     const onData = (buf: Buffer) => {
       for (const line of buf.toString('utf8').split(/\r?\n/)) {
