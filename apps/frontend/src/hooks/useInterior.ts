@@ -42,7 +42,17 @@ export function useInteriorRevision(id: string | null) {
 }
 
 export function useRenderSets(workspaceId: string) {
-  return useQuery({ queryKey: interiorKeys.renderSets(workspaceId), queryFn: () => interiorApi.listRenderSets(workspaceId), enabled: !!workspaceId })
+  // Renders run as background jobs on the server; poll while any view is still queued or rendering.
+  return useQuery({
+    queryKey: interiorKeys.renderSets(workspaceId),
+    queryFn: () => interiorApi.listRenderSets(workspaceId),
+    enabled: !!workspaceId,
+    refetchInterval: (q) => (q.state.data?.some((s) => s.status === 'queued' || s.status === 'running') ? 4000 : false),
+  })
+}
+
+export function useRenderCapabilities() {
+  return useQuery({ queryKey: ['interior', 'render-capabilities'] as const, queryFn: () => interiorApi.renderCapabilities(), staleTime: 60_000 })
 }
 
 /** Object URL for an authenticated page raster (revoked on unmount). */

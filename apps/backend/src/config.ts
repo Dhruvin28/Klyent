@@ -86,6 +86,19 @@ export const config = {
     workerConcurrency: parseInt(process.env.INTERIOR_WORKER_CONCURRENCY ?? '2'),
     leaseSeconds: parseInt(process.env.INTERIOR_WORKER_LEASE_SECONDS ?? '300'),
     sceneSchemaVersion: 'interior-scene/1',
+    // Server-side rendering: Blender (Cycles) for the physically based image, then an
+    // OpenAI image model to push it to photographic realism under a strict fidelity check.
+    render: {
+      blenderPath: process.env.BLENDER_PATH ?? '',
+      blenderDevice: process.env.BLENDER_DEVICE ?? 'cpu',
+      blenderThreads: parseInt(process.env.BLENDER_THREADS ?? '0'),
+      timeoutMs: parseInt(process.env.INTERIOR_RENDER_TIMEOUT_MS ?? String(45 * 60 * 1000)),
+      enhance: (process.env.INTERIOR_RENDER_ENHANCE ?? 'true') !== 'false',
+      imageModel: process.env.INTERIOR_RENDER_IMAGE_MODEL ?? 'gpt-image-2',
+      imageQuality: process.env.INTERIOR_RENDER_IMAGE_QUALITY ?? 'high',
+      verifyModel: process.env.INTERIOR_RENDER_VERIFY_MODEL ?? '',
+      enhanceTimeoutMs: parseInt(process.env.INTERIOR_RENDER_ENHANCE_TIMEOUT_MS ?? String(10 * 60 * 1000)),
+    },
   },
   studioUpload: {
     maxSize: 50 * 1024 * 1024, // 50MB — documents/media

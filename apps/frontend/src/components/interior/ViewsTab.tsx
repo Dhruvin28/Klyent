@@ -1,41 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import * as THREE from 'three'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, ImageOff, Loader2, Play, Square } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CloudCog, ImageOff, Loader2, Play, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import { interiorApi } from '@/api/interior'
 import { apiErrorMessage } from '@/api/visualizer'
-import { interiorKeys, useRenderSets } from '@/hooks/useInterior'
+import { interiorKeys, useRenderCapabilities, useRenderSets } from '@/hooks/useInterior'
 import { useDesignAssetUrl } from '@/hooks/useDesigner'
-import { pathTrace } from '@/lib/designer/render'
-import type { RenderSet, RevisionDetail, ViewSpec, WorkspaceSummary } from '@/lib/interior/types'
-import { shortHash, useSceneContext } from './common'
+import type { RenderOutput, RenderSet, RevisionDetail, ViewSpec, WorkspaceSummary } from '@/lib/interior/types'
+import { shortHash } from './common'
 
 const QUALITY = { draft: { label: 'Draft', samples: 64 }, presentation: { label: 'Presentation', samples: 256 }, high_resolution: { label: 'High resolution', samples: 768 } } as const
 type Quality = keyof typeof QUALITY
 const SIZES = [1280, 1920, 2560, 3840]
 const GROUP_LABEL: Record<ViewSpec['group'], string> = { perspective: 'Perspectives', elevation: 'Elevations', top: 'Top cutaway', ceiling: 'Reflected ceiling', isometric: 'Isometric' }
 
-// View specs are in plan space (mm, x/y on the floor, z up); the scene is in metres with y up
-// and plan y on world z, exactly like toWorld() in the designer scene.
-const MM = 0.001
-const toWorldVec = ([x, y, z]: [number, number, number]) => new THREE.Vector3(x * MM, z * MM, y * MM)
-
-interface Progress {
-  set: RenderSet
-  index: number
-  total: number
-  view: ViewSpec
-  samples: number
-  target: number
-}
-
 export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; revision: RevisionDetail }) {
   const ws = summary.workspace
-  const { ctx } = useSceneContext()
   const { data: sets } = useRenderSets(ws.id)
+  const { data: caps } = useRenderCapabilities()
   const qc = useQueryClient()
   const { toast } = useToast()
   const approval = revision.approvals.find((a) => a.sceneHash === revision.sceneHash)
@@ -43,12 +27,10 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
   const [selected, setSelected] = useState<Set<string>>(() => new Set(views.filter((v) => v.group !== 'elevation').map((v) => v.key)))
   const [quality, setQuality] = useState<Quality>('presentation')
   const [longSide, setLongSide] = useState(1920)
-  const [progress, setProgress] = useState<Progress | null>(null)
-  const control = useRef<{ stop: boolean; handle?: { finish: () => void; cancel: () => void } }>({ stop: false })
-  const previewHost = useRef<HTMLDivElement>(null)
+  const [photoreal, setPhotoreal] = useState(true)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => setSelected(new Set(views.filter((v) => v.group !== 'elevation').map((v) => v.key))), [revision.id]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => control.current.handle?.cancel(), [])
 
   const rooms = useMemo(() => {
     const byRoom = new Map<string, { name: string; views: ViewSpec[] }>()
@@ -69,70 +51,33 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
       return n
     })
 
-  const renderSet = async (set: RenderSet) => {
-    const pending = set.manifest.views.filter((v) => set.outputs[v.key]?.status !== 'complete')
-    control.current.stop = false
-    let current = set
-    for (let i = 0; i < pending.length; i++) {
-      if (control.current.stop) break
-      const view = pending[i]
-      const aspect = view.aspect || 16 / 9
-      const width = aspect >= 1 ? set.manifest.quality.longSide : Math.round(set.manifest.quality.longSide * aspect)
-      const height = aspect >= 1 ? Math.round(set.manifest.quality.longSide / aspect) : set.manifest.quality.longSide
-      setProgress({ set: current, index: i + 1, total: pending.length, view, samples: 0, target: set.manifest.quality.samples })
-      try {
-        const handle = pathTrace(
-          revision.scene.plan,
-          ctx,
-          {
-            kind: 'render',
-            width,
-            height,
-            samples: set.manifest.quality.samples,
-            pose: { position: toWorldVec(view.position), target: toWorldVec(view.target), fov: view.fov },
-            ortho: view.projection === 'orthographic' && view.ortho ? { width: view.ortho.width * MM, height: view.ortho.height * MM } : null,
-            up: view.up ? ([view.up[0], view.up[2], view.up[1]] as [number, number, number]) : undefined,
-            preset: view.visibility,
-            mirrorX: view.mirrorX,
-          },
-          (samples) => setProgress((p) => (p ? { ...p, samples } : p))
-        )
-        control.current.handle = handle
-        const host = previewHost.current
-        if (host) {
-          host.innerHTML = ''
-          handle.canvas.style.width = '100%'
-          handle.canvas.style.height = 'auto'
-          handle.canvas.style.borderRadius = '6px'
-          host.appendChild(handle.canvas)
-        }
-        const blob = await handle.done
-        current = await interiorApi.uploadRenderOutput(set.id, view.key, blob, width, height)
-      } catch (err) {
-        if ((err as DOMException)?.name === 'AbortError') break
-        current = await interiorApi.failRenderOutput(set.id, view.key, (err as Error)?.message ?? 'Render failed').catch(() => current)
-        toast({ title: `“${view.name}” failed`, description: (err as Error)?.message, variant: 'destructive' })
-      }
-      await qc.invalidateQueries({ queryKey: interiorKeys.renderSets(ws.id) })
-    }
-    control.current.handle = undefined
-    setProgress(null)
-    await qc.invalidateQueries({ queryKey: interiorKeys.renderSets(ws.id) })
-  }
-
+  // Rendering happens entirely on the server as background jobs: this only queues the set.
   const start = async (rerunAll = false) => {
+    setBusy(true)
     try {
       const keys = rerunAll ? views.map((v) => v.key) : views.filter((v) => selected.has(v.key)).map((v) => v.key)
-      const set = await interiorApi.createRenderSet(revision.id, { viewKeys: keys, quality, longSide, allowDraft: !approval || approval.mode !== 'final', rerun: rerunAll })
+      await interiorApi.createRenderSet(revision.id, { viewKeys: keys, quality, longSide, allowDraft: !approval || approval.mode !== 'final', rerun: rerunAll, enhance: photoreal })
       await qc.invalidateQueries({ queryKey: interiorKeys.renderSets(ws.id) })
       await qc.invalidateQueries({ queryKey: interiorKeys.workspace(ws.id) })
-      await renderSet(set)
+      toast({ title: 'Render queued', description: 'It runs on the server; you can close this page and come back.' })
     } catch (err) {
       toast({ title: 'Could not start rendering', description: apiErrorMessage(err), variant: 'destructive' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const retry = async (set: RenderSet) => {
+    try {
+      await interiorApi.retryRenderSet(set.id)
+      await qc.invalidateQueries({ queryKey: interiorKeys.renderSets(ws.id) })
+    } catch (err) {
+      toast({ title: 'Could not retry', description: apiErrorMessage(err), variant: 'destructive' })
     }
   }
 
   const label = approval?.mode === 'final' ? 'final' : 'draft'
+  const unavailable = caps?.serverRendering === false
 
   return (
     <div className="space-y-5">
@@ -200,47 +145,29 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
                 ))}
               </select>
             </label>
-            {!progress ? (
-              <>
-                <Button className="w-full gap-1.5" disabled={!selected.size} onClick={() => start()}>
-                  <Play className="h-4 w-4" /> Render {selected.size} view{selected.size === 1 ? '' : 's'}
-                </Button>
-                <Button variant="outline" className="w-full gap-1.5" disabled={!views.length} onClick={() => start(true)}>
-                  <Play className="h-4 w-4" /> Re-render all {views.length} views (new set)
-                </Button>
-              </>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs">
-                  View {progress.index}/{progress.total}: <span className="font-medium">{progress.view.name}</span>
-                </p>
-                <div className="h-1.5 overflow-hidden rounded bg-muted">
-                  <div className="h-full bg-primary transition-all" style={{ width: `${Math.min(100, (progress.samples / progress.target) * 100)}%` }} />
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {progress.samples}/{progress.target} samples · rendering on this device’s GPU; keep the tab open.
-                </p>
-                <div className="flex gap-1.5">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => control.current.handle?.finish()}>
-                    Finish this view now
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="gap-1"
-                    onClick={() => {
-                      control.current.stop = true
-                      control.current.handle?.cancel()
-                    }}
-                  >
-                    <Square className="h-3.5 w-3.5" /> Stop
-                  </Button>
-                </div>
-              </div>
+            <label className="flex items-start gap-2 text-xs">
+              <input type="checkbox" className="mt-0.5" checked={photoreal && caps?.photoreal !== false} disabled={caps?.photoreal === false} onChange={(e) => setPhotoreal(e.target.checked)} />
+              <span>
+                Photoreal pass (AI)
+                <span className="block text-[11px] text-muted-foreground">Upgrades perspective views to photographic realism, then checks that walls, openings and furniture were not changed. The exact 3D render is always kept.</span>
+              </span>
+            </label>
+            <Button className="w-full gap-1.5" disabled={!selected.size || busy || unavailable} onClick={() => start()}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Render {selected.size} view{selected.size === 1 ? '' : 's'} on server
+            </Button>
+            <Button variant="outline" className="w-full gap-1.5" disabled={!views.length || busy || unavailable} onClick={() => start(true)}>
+              <Play className="h-4 w-4" /> Re-render all {views.length} views (new set)
+            </Button>
+            {unavailable && (
+              <p className="flex items-start gap-1.5 rounded-md bg-destructive/10 p-2 text-[11px] text-destructive">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> The render worker has no Blender (BLENDER_PATH is not set), so rendering is unavailable.
+              </p>
             )}
+            <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+              <CloudCog className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Rendered on the server in the background (Blender Cycles); nothing runs on this device.
+            </p>
             <p className="text-[11px] text-muted-foreground">Perspective images are not measurable; dimensions come from the elevations and the validation report.</p>
           </div>
-          <div ref={previewHost} className={cn('overflow-hidden rounded-lg border bg-muted', !progress && 'hidden')} />
         </div>
       </div>
 
@@ -248,16 +175,19 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
         <h3 className="text-sm font-semibold">Render sets</h3>
         {!sets?.length && <p className="text-sm text-muted-foreground">No renders yet.</p>}
         {sets?.map((set) => (
-          <RenderSetCard key={set.id} set={set} busy={!!progress} onResume={() => renderSet(set)} />
+          <RenderSetCard key={set.id} set={set} onRetry={() => retry(set)} />
         ))}
       </div>
     </div>
   )
 }
 
-function RenderSetCard({ set, busy, onResume }: { set: RenderSet; busy: boolean; onResume: () => void }) {
+function RenderSetCard({ set, onRetry }: { set: RenderSet; onRetry: () => void }) {
   const views = set.manifest.views
-  const done = views.filter((v) => set.outputs[v.key]?.status === 'complete').length
+  const outs = views.map((v) => set.outputs[v.key])
+  const done = outs.filter((o) => o?.status === 'complete').length
+  const failed = outs.filter((o) => o?.status === 'failed').length
+  const active = outs.filter((o) => o?.status === 'running' || o?.status === 'pending').length
   return (
     <div className="rounded-lg border p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
@@ -266,11 +196,11 @@ function RenderSetCard({ set, busy, onResume }: { set: RenderSet; busy: boolean;
           {set.manifest.label === 'final' ? 'Final' : 'DRAFT'}
         </span>
         <span className="text-xs text-muted-foreground">
-          {set.manifest.quality.preset} · {set.manifest.quality.longSide}px · {done}/{views.length} views · manifest {shortHash(set.manifestHash)}
+          {set.manifest.quality.preset} · {set.manifest.quality.longSide}px · {done}/{views.length} views{active ? ` · ${active} rendering/queued` : ''} · manifest {shortHash(set.manifestHash)}
         </span>
-        {done < views.length && (
-          <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" disabled={busy} onClick={onResume}>
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Render remaining'}
+        {failed > 0 && active === 0 && (
+          <Button size="sm" variant="outline" className="ml-auto h-7 gap-1 text-xs" onClick={onRetry}>
+            <RotateCcw className="h-3.5 w-3.5" /> Retry {failed} failed
           </Button>
         )}
       </div>
@@ -283,22 +213,38 @@ function RenderSetCard({ set, busy, onResume }: { set: RenderSet; busy: boolean;
   )
 }
 
-function OutputThumb({ view, output }: { view: ViewSpec; output?: RenderSet['outputs'][string] }) {
-  const { url } = useDesignAssetUrl(output?.status === 'complete' ? output.assetId : null)
+function OutputThumb({ view, output }: { view: ViewSpec; output?: RenderOutput }) {
+  const [showRaw, setShowRaw] = useState(false)
+  const hasBoth = !!output?.enhancedAssetId && !!output?.rawAssetId
+  const id = output?.status === 'complete' ? (showRaw && output.rawAssetId ? output.rawAssetId : output.assetId) : null
+  const { url } = useDesignAssetUrl(id)
+  const pending = output?.status === 'pending' || output?.status === 'running'
+  const badge = output?.status !== 'complete' ? null : showRaw || !output.enhancedAssetId ? '3D render' : output.enhancement === 'verified' ? 'Photoreal · verified' : 'Photoreal'
   return (
     <figure className="space-y-1">
       {url ? (
-        <a href={url} target="_blank" rel="noreferrer">
-          <img src={url} alt={view.name} className="aspect-video w-full rounded-md border bg-muted object-cover" />
-        </a>
+        <div className="relative">
+          <a href={url} target="_blank" rel="noreferrer">
+            <img src={url} alt={view.name} className="aspect-video w-full rounded-md border bg-muted object-cover" />
+          </a>
+          {badge && <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{badge}</span>}
+        </div>
       ) : (
-        <div className="flex aspect-video w-full items-center justify-center rounded-md border bg-muted text-muted-foreground">
-          {output?.status === 'failed' ? <AlertTriangle className="h-4 w-4 text-destructive" /> : output?.status === 'complete' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+        <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 rounded-md border bg-muted text-muted-foreground">
+          {output?.status === 'failed' ? <AlertTriangle className="h-4 w-4 text-destructive" /> : pending || output?.status === 'complete' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+          {pending && <span className="text-[10px]">{output?.status === 'running' ? 'Rendering…' : 'Queued'}</span>}
         </div>
       )}
-      <figcaption className="truncate text-[11px] text-muted-foreground" title={view.note ?? view.name}>
+      <figcaption className="truncate text-[11px] text-muted-foreground" title={output?.error ?? output?.note ?? view.note ?? view.name}>
         {view.name}
+        {output?.status === 'failed' && <span className="text-destructive"> · {output.error}</span>}
       </figcaption>
+      {hasBoth && (
+        <button type="button" className="text-[10px] text-primary underline" onClick={() => setShowRaw((v) => !v)}>
+          {showRaw ? 'Show photoreal' : 'Show exact 3D render'}
+        </button>
+      )}
+      {output?.note && <p className="text-[10px] text-amber-700 dark:text-amber-300">{output.note}</p>}
     </figure>
   )
 }

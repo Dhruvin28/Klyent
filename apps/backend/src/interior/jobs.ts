@@ -9,7 +9,7 @@ import { db, intJobs } from '../db'
 // a lease renewed by heartbeat, and may only commit results while their lease token is
 // current. Delivery is at-least-once; handlers must be idempotent.
 
-export type JobType = 'extract_document' | 'interpret_page' | 'build_scene'
+export type JobType = 'extract_document' | 'interpret_page' | 'build_scene' | 'render_view'
 
 export interface JobContext {
   job: typeof intJobs.$inferSelect

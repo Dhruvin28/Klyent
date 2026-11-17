@@ -354,6 +354,17 @@ export interface RevisionDetail extends RevisionSummary {
   views: ViewSpec[]
 }
 
+export interface RenderOutput {
+  status: 'pending' | 'running' | 'complete' | 'failed'
+  /** Image shown first: verified photoreal image if any, else the Blender render. */
+  assetId: string | null
+  rawAssetId?: string | null
+  enhancedAssetId?: string | null
+  enhancement?: 'verified' | 'unverified' | 'rejected' | 'failed' | 'off'
+  note?: string | null
+  error: string | null
+}
+
 export interface RenderSet {
   id: string
   workspaceId: string
@@ -367,11 +378,13 @@ export interface RenderSet {
     label: 'final' | 'draft'
     approvalId: string | null
     quality: { preset: string; samples: number; longSide: number }
+    renderer?: { name: string; photoreal: { model: string; fidelityCheck: boolean } | null }
+    enhance?: boolean
     views: ViewSpec[]
   }
   manifestHash: string
   status: 'queued' | 'running' | 'partially_complete' | 'complete' | 'failed'
-  outputs: Record<string, { status: 'pending' | 'complete' | 'failed'; assetId: string | null; error: string | null }>
+  outputs: Record<string, RenderOutput>
   createdAt: string
 }
 

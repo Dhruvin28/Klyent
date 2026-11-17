@@ -28,6 +28,8 @@ import { buildCameras, type ViewSpec } from '../../interior/build/views'
 import { calibratePage } from '../../interior/geometry/calibrate'
 import { sniffDocument } from '../../interior/extract'
 import { enqueueJob } from '../../interior/jobs'
+import { blenderConfigured } from '../../interior/render/blender'
+import { enqueueRenderSet, RENDER_QUALITY } from '../../interior/render/service'
 import {
   ServiceError,
   aiConfigured,
@@ -52,11 +54,7 @@ function httpError(statusCode: number, message: string, code = 'ERROR') {
 
 const pointSchema = z.object({ x: z.number().finite(), y: z.number().finite() })
 
-const QUALITY = {
-  draft: { samples: 64, label: 'Draft' },
-  presentation: { samples: 256, label: 'Presentation' },
-  high_resolution: { samples: 768, label: 'High resolution' },
-} as const
+const QUALITY = RENDER_QUALITY
 
 export default async function interiorRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -523,7 +521,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
   app.post('/revisions/:id/render-sets', async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = z
-      .object({ viewKeys: z.array(z.string().min(1).max(200)).min(1).max(80), quality: z.enum(['draft', 'presentation', 'high_resolution']), longSide: z.number().int().min(640).max(4096), allowDraft: z.boolean().default(false), rerun: z.boolean().default(false) })
+      .object({ viewKeys: z.array(z.string().min(1).max(200)).min(1).max(80), quality: z.enum(['draft', 'presentation', 'high_resolution']), longSide: z.number().int().min(640).max(4096), allowDraft: z.boolean().default(false), rerun: z.boolean().default(false), enhance: z.boolean().default(true) })
       .parse(request.body)
     const rev = await ownedRevision(uid(request), id)
     let ws = await ownedWorkspace(uid(request), rev.workspaceId)
@@ -532,6 +530,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
       ? await db.select().from(intApprovals).where(and(eq(intApprovals.revisionId, rev.id), eq(intApprovals.sceneHash, rev.sceneHash))).orderBy(desc(intApprovals.approvedAt)).limit(1)
       : []
     if (!approval && !body.allowDraft) throw httpError(409, 'Approve this revision before producing final renders, or render it as a labelled draft.', 'APPROVAL_REQUIRED')
+    if (!blenderConfigured()) throw httpError(503, 'Server-side rendering is not set up: the render worker has no Blender (set BLENDER_PATH).', 'RENDER_UNAVAILABLE')
     const all = buildCameras(scene.plan)
     const views: ViewSpec[] = body.viewKeys.map((k) => {
       const v = all.find((x) => x.key === k)
@@ -551,7 +550,8 @@ export default async function interiorRoutes(app: FastifyInstance) {
       approvalId: approval?.id ?? null,
       validationRunId: approval?.validationRunId ?? null,
       label: status,
-      renderer: { name: 'three-gpu-pathtracer', version: '0.0.27', runtime: 'browser WebGL2' },
+      renderer: { name: 'blender-cycles', runtime: 'server background worker', denoiser: 'OpenImageDenoise', photoreal: body.enhance && config.interior.render.enhance ? { model: config.interior.render.imageModel, fidelityCheck: true } : null },
+      enhance: body.enhance,
       quality: { preset: body.quality, samples: QUALITY[body.quality].samples, longSide: body.longSide, bounces: 6 },
       lighting: scene.plan.lighting,
       views,
@@ -564,6 +564,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
     const outputs = Object.fromEntries(views.map((v) => [v.key, { status: 'pending', assetId: null, error: null }]))
     await db.insert(intRenderSets).values({ id: setId, userId: ws.userId, workspaceId: ws.id, revisionId: rev.id, approvalId: approval?.id ?? null, designProjectId: ws.designProjectId!, manifest, manifestHash, status: 'queued', outputs })
     const [row] = await db.select().from(intRenderSets).where(eq(intRenderSets.id, setId)).limit(1)
+    await enqueueRenderSet(row)
     return reply.code(201).send({ data: row })
   })
 
@@ -573,73 +574,22 @@ export default async function interiorRoutes(app: FastifyInstance) {
     return { data: await db.select().from(intRenderSets).where(eq(intRenderSets.workspaceId, ws.id)).orderBy(desc(intRenderSets.createdAt)).limit(50) }
   })
 
-  async function updateOutput(userId: string, setId: string, viewKey: string, value: { status: string; assetId: string | null; error: string | null }) {
-    return db.transaction(async (tx) => {
-      const t = tx as unknown as typeof db
-      const [set] = await t.select().from(intRenderSets).where(and(eq(intRenderSets.id, setId), eq(intRenderSets.userId, userId))).for('update').limit(1)
-      if (!set) throw httpError(404, 'Render set not found', 'NOT_FOUND')
-      const outputs = { ...(set.outputs as Record<string, { status: string; assetId: string | null }>) }
-      if (!outputs[viewKey]) throw httpError(400, 'Unknown view for this render set')
-      const previous = outputs[viewKey].assetId
-      outputs[viewKey] = value
-      const values = Object.values(outputs)
-      const status = values.every((o) => o.status === 'complete') ? 'complete' : values.some((o) => o.status === 'complete') ? 'partially_complete' : values.every((o) => o.status === 'failed') ? 'failed' : 'running'
-      await t.update(intRenderSets).set({ outputs, status }).where(eq(intRenderSets.id, set.id))
-      return { set: { ...set, outputs, status }, previous }
-    })
-  }
-
-  app.post('/render-sets/:id/outputs/:viewKey', async (request, reply) => {
-    const { id, viewKey } = request.params as { id: string; viewKey: string }
-    const userId = uid(request)
-    const [set] = await db.select().from(intRenderSets).where(and(eq(intRenderSets.id, id), eq(intRenderSets.userId, userId))).limit(1)
+  // Retry the views that failed or never ran (e.g. after configuring Blender); each is a background job.
+  app.post('/render-sets/:id/retry', async (request) => {
+    const { id } = request.params as { id: string }
+    const [set] = await db.select().from(intRenderSets).where(and(eq(intRenderSets.id, id), eq(intRenderSets.userId, uid(request)))).limit(1)
     if (!set) throw httpError(404, 'Render set not found', 'NOT_FOUND')
-    const manifest = set.manifest as { views: ViewSpec[]; label: string; revisionNo: number; sceneHash: string; quality: { samples: number; preset: string } }
-    const view = manifest.views.find((v) => v.key === viewKey)
-    if (!view) throw httpError(400, 'Unknown view for this render set')
-    if (!request.isMultipart()) throw httpError(415, 'Expected multipart/form-data')
-    let file: Buffer | null = null
-    let width = 0
-    let height = 0
-    for await (const part of request.parts({ limits: { files: 1, fileSize: 40 * 1024 * 1024, fields: 4 } })) {
-      if (part.type === 'file') {
-        const chunks: Buffer[] = []
-        for await (const c of part.file) chunks.push(c as Buffer)
-        if (part.file.truncated) throw httpError(413, 'Render is too large', 'TOO_LARGE')
-        file = Buffer.concat(chunks)
-      } else if (part.fieldname === 'width') width = parseInt(String(part.value), 10) || 0
-      else if (part.fieldname === 'height') height = parseInt(String(part.value), 10) || 0
-    }
-    const mime = file && sniffImageMime(file)
-    if (!file || !mime) throw httpError(415, 'Render must be a PNG or JPEG image')
-    const assetId = crypto.randomUUID()
-    const ext = mime === 'image/png' ? 'png' : 'jpg'
-    const label = manifest.label === 'final' ? '' : ' · DRAFT'
-    await db.insert(designAssets).values({
-      id: assetId,
-      userId,
-      projectId: set.designProjectId,
-      kind: 'render',
-      name: `${view.name} · R${manifest.revisionNo}${label}.${ext}`.slice(0, 480),
-      mimeType: mime,
-      size: file.length,
-      width: width || null,
-      height: height || null,
-      sha256: sha256(file),
-      meta: { camera: view.name, samples: manifest.quality.samples, preset: manifest.quality.preset, interior: { renderSetId: set.id, revisionNo: manifest.revisionNo, sceneHash: manifest.sceneHash, viewKey, group: view.group, label: manifest.label, projection: view.projection } },
-      data: file,
-    })
-    const { set: updated, previous } = await updateOutput(userId, set.id, viewKey, { status: 'complete', assetId, error: null })
-    if (previous && previous !== assetId) await db.delete(designAssets).where(and(eq(designAssets.id, previous), eq(designAssets.userId, userId)))
-    return reply.code(201).send({ data: updated })
+    if (!blenderConfigured()) throw httpError(503, 'Server-side rendering is not set up: the render worker has no Blender (set BLENDER_PATH).', 'RENDER_UNAVAILABLE')
+    const outputs = set.outputs as Record<string, { status: string }>
+    const keys = Object.entries(outputs).filter(([, o]) => o.status === 'failed' || o.status === 'pending').map(([k]) => k)
+    const next = Object.fromEntries(Object.entries(outputs).map(([k, o]) => [k, keys.includes(k) ? { status: 'pending', assetId: null, error: null } : o]))
+    await db.update(intRenderSets).set({ outputs: next, status: 'queued' }).where(eq(intRenderSets.id, set.id))
+    await enqueueRenderSet(set, keys, Date.now())
+    const [row] = await db.select().from(intRenderSets).where(eq(intRenderSets.id, set.id)).limit(1)
+    return { data: row }
   })
 
-  app.post('/render-sets/:id/outputs/:viewKey/fail', async (request) => {
-    const { id, viewKey } = request.params as { id: string; viewKey: string }
-    const body = z.object({ error: z.string().max(500) }).parse(request.body)
-    const { set } = await updateOutput(uid(request), id, viewKey, { status: 'failed', assetId: null, error: body.error })
-    return { data: set }
-  })
+  app.get('/render-capabilities', async () => ({ data: { serverRendering: blenderConfigured(), photoreal: config.interior.render.enhance && !!config.openai.apiKey, imageModel: config.interior.render.imageModel } }))
 
   // Designer project linkage info (used by the UI to open the designer).
   app.get('/workspaces/:id/designer', async (request) => {

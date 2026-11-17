@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').cpSync('src/interior/render/blender','dist/interior/render/blender',{recursive:true})\"",
     "start": "node dist/index.js",
     "db:migrate": "drizzle-kit push",
     "db:push": "drizzle-kit push",
@@ -24,6 +24,7 @@
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.36.0",
+    "earcut": "^3.2.4",
     "fastify": "^4.28.1",
     "fastify-plugin": "^4.5.1",
     "jszip": "^3.10.1",
@@ -40,6 +41,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/earcut": "^3.0.0",
     "@types/node": "^20.14.9",
     "@types/nodemailer": "^8.0.1",
     "@types/pdf-parse": "^1.1.4",

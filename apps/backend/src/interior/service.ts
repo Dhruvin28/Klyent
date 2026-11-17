@@ -15,6 +15,7 @@ import { readSegments } from './extract/common'
 import { enqueueJob, JobError, registerJobHandler, setJobFailureHook, setJobSuccessHook, type JobContext } from './jobs'
 import { validateScene } from './validate'
 import { prepareInterpretation } from './geometry/prepare'
+import { onRenderJobFailed } from './render/service'
 
 export type Workspace = typeof intWorkspaces.$inferSelect
 export type Revision = typeof intRevisions.$inferSelect
@@ -401,6 +402,9 @@ setJobFailureHook(async (job, willRetry) => {
   } else if (job.type === 'interpret_page') {
     const [j] = await db.select({ error: intJobs.error }).from(intJobs).where(eq(intJobs.id, job.id)).limit(1)
     await db.update(intPages).set({ status: 'failed', error: j?.error ?? 'Interpretation failed' }).where(eq(intPages.id, job.targetId))
+  } else if (job.type === 'render_view') {
+    const [j] = await db.select({ error: intJobs.error }).from(intJobs).where(eq(intJobs.id, job.id)).limit(1)
+    await onRenderJobFailed({ targetId: job.targetId, input: job.input, error: j?.error ?? null })
   }
 })
 

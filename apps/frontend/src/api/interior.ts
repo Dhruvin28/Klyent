@@ -84,16 +84,9 @@ export const interiorApi = {
   decisions: async (workspaceId: string) => (await api.get<{ data: Decision[] }>(`/interior/workspaces/${workspaceId}/decisions`)).data.data,
   report: async (revisionId: string) => (await api.get<{ data: Report }>(`/interior/revisions/${revisionId}/report`)).data.data,
 
-  createRenderSet: async (revisionId: string, body: { viewKeys: string[]; quality: 'draft' | 'presentation' | 'high_resolution'; longSide: number; allowDraft: boolean; rerun?: boolean }) =>
+  createRenderSet: async (revisionId: string, body: { viewKeys: string[]; quality: 'draft' | 'presentation' | 'high_resolution'; longSide: number; allowDraft: boolean; rerun?: boolean; enhance?: boolean }) =>
     (await api.post<{ data: RenderSet }>(`/interior/revisions/${revisionId}/render-sets`, body)).data.data,
   listRenderSets: async (workspaceId: string) => (await api.get<{ data: RenderSet[] }>(`/interior/workspaces/${workspaceId}/render-sets`)).data.data,
-  uploadRenderOutput: async (setId: string, viewKey: string, blob: Blob, width: number, height: number) => {
-    const form = new FormData()
-    form.append('width', String(width))
-    form.append('height', String(height))
-    form.append('file', blob, `${viewKey.replace(/[^a-z0-9-]+/gi, '_')}.jpg`)
-    return (await api.post<{ data: RenderSet }>(`/interior/render-sets/${setId}/outputs/${encodeURIComponent(viewKey)}`, form, LONG)).data.data
-  },
-  failRenderOutput: async (setId: string, viewKey: string, error: string) =>
-    (await api.post<{ data: RenderSet }>(`/interior/render-sets/${setId}/outputs/${encodeURIComponent(viewKey)}/fail`, { error: error.slice(0, 500) })).data.data,
+  retryRenderSet: async (setId: string) => (await api.post<{ data: RenderSet }>(`/interior/render-sets/${setId}/retry`)).data.data,
+  renderCapabilities: async () => (await api.get<{ data: { serverRendering: boolean; photoreal: boolean; imageModel: string } }>('/interior/render-capabilities')).data.data,
 }
