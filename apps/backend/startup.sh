@@ -15,13 +15,19 @@ install_blender() {
     || echo "[startup] apt step failed (continuing)"
   MAJOR="${BLENDER_VERSION%.*}"
   URL="https://download.blender.org/release/Blender${MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
-  if curl -fsSL "$URL" -o /home/tmp/blender.tar.xz && tar -xJf /home/tmp/blender.tar.xz -C "$BLENDER_DIR" --strip-components=1; then
-    echo "[startup] Blender installed: $("$BLENDER_DIR/blender" --version 2>/dev/null | head -1)"
-  else
-    echo "[startup] Blender download/extract failed"
+  echo "[startup] downloading $URL"
+  # Stream straight into tar (no temp file), with retries; the pipe fails if either side fails.
+  set -o pipefail
+  for attempt in 1 2 3; do
+    if curl -fL --retry 3 --retry-delay 5 --connect-timeout 30 "$URL" | tar -xJ -C "$BLENDER_DIR" --strip-components=1; then
+      echo "[startup] Blender installed: $("$BLENDER_DIR/blender" --version 2>&1 | head -1)"
+      return 0
+    fi
+    echo "[startup] attempt $attempt failed"
     rm -rf "$BLENDER_DIR"/* 2>/dev/null
-  fi
-  rm -f /home/tmp/blender.tar.xz
+    sleep 5
+  done
+  echo "[startup] Blender install failed after 3 attempts"
 }
 
 # Runtime libraries are not persistent (container filesystem), so always run the apt step,
