@@ -10,6 +10,18 @@ install_blender() {
   # Complete only if the marker exists AND Blender's bundled Python is present (a restart
   # mid-extract leaves the binary without its python/ folder).
   if [ -f "$BLENDER_DIR/.installed" ] && ls "$BLENDER_DIR"/*/python/lib >/dev/null 2>&1; then return 0; fi
+  # /home is shared by every instance of the app: only one may install at a time. mkdir is
+  # atomic; a lock older than 30 minutes is treated as left over from a crashed install.
+  LOCK="$BLENDER_DIR.lock"
+  waited=0
+  while ! mkdir "$LOCK" 2>/dev/null; do
+    if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +30 2>/dev/null)" ]; then rm -rf "$LOCK"; continue; fi
+    echo "[startup] another instance is installing Blender; waiting"
+    sleep 20; waited=$((waited + 20))
+    if [ -f "$BLENDER_DIR/.installed" ] && ls "$BLENDER_DIR"/*/python/lib >/dev/null 2>&1; then return 0; fi
+    if [ "$waited" -gt 2400 ]; then echo "[startup] gave up waiting for the install lock"; return 1; fi
+  done
+  trap 'rm -rf "$LOCK"' RETURN
   rm -rf "$BLENDER_DIR"/* "$BLENDER_DIR"/.installed 2>/dev/null
   echo "[startup] installing Blender $BLENDER_VERSION into $BLENDER_DIR"
   mkdir -p "$BLENDER_DIR" /home/tmp
@@ -22,7 +34,7 @@ install_blender() {
   # Stream straight into tar (no temp file), with retries; the pipe fails if either side fails.
   set -o pipefail
   for attempt in 1 2 3; do
-    if curl -fL --retry 3 --retry-delay 5 --connect-timeout 30 "$URL" | tar -xJ -C "$BLENDER_DIR" --strip-components=1; then
+    if curl -fL --retry 3 --retry-delay 5 --connect-timeout 30 "$URL" | tar -xJm --no-same-owner -C "$BLENDER_DIR" --strip-components=1; then
       touch "$BLENDER_DIR/.installed"
       echo "[startup] Blender installed: $("$BLENDER_DIR/blender" --version 2>&1 | head -1)"
       return 0
@@ -36,6 +48,6 @@ install_blender() {
 
 # Runtime libraries are not persistent (container filesystem), so always run the apt step,
 # but only download Blender once.
-( install_blender > /home/LogFiles/blender-install.log 2>&1 ) &
+( install_blender >> /home/LogFiles/blender-install.log 2>&1 ) &
 
 exec node apps/backend/dist/index.js
