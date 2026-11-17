@@ -69,7 +69,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'VALIDATION', code: 'VALIDATION', message: e.issues.slice(0, 4).map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ') })
     }
     if (e.code === 'FST_REQ_FILE_TOO_LARGE') return reply.code(413).send({ error: 'TOO_LARGE', code: 'TOO_LARGE', message: e.message })
-    if (e.statusCode && e.statusCode < 500) return reply.code(e.statusCode).send({ error: e.code ?? e.name, code: e.code ?? 'ERROR', message: e.message })
+    if (e.statusCode && (e.statusCode < 500 || e.statusCode === 503)) return reply.code(e.statusCode).send({ error: e.code ?? e.name, code: e.code ?? 'ERROR', message: e.message })
     request.log.error({ err: e }, 'Interior request failed')
     return reply.code(500).send({ error: 'INTERNAL', code: 'INTERNAL', message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : e.message })
   })
