@@ -1,0 +1,31 @@
+#!/bin/bash
+# Azure App Service (Linux) startup: makes sure Blender is available for the Interior 3D
+# render worker, then starts the API. Blender lives under /home (persistent across restarts);
+# the install runs in the background so the API is up immediately. Until it finishes,
+# render jobs fail with a retryable "Blender not found" and the UI offers Retry.
+BLENDER_VERSION="${BLENDER_VERSION:-4.2.3}"
+BLENDER_DIR="${BLENDER_DIR:-/home/blender}"
+
+install_blender() {
+  if [ -x "$BLENDER_DIR/blender" ]; then return 0; fi
+  echo "[startup] installing Blender $BLENDER_VERSION into $BLENDER_DIR"
+  mkdir -p "$BLENDER_DIR" /home/tmp
+  (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+    xz-utils libxi6 libxrender1 libxkbcommon0 libxxf86vm1 libxfixes3 libxext6 libx11-6 libsm6 libgl1 libegl1 libgomp1 ca-certificates) \
+    || echo "[startup] apt step failed (continuing)"
+  MAJOR="${BLENDER_VERSION%.*}"
+  URL="https://download.blender.org/release/Blender${MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+  if curl -fsSL "$URL" -o /home/tmp/blender.tar.xz && tar -xJf /home/tmp/blender.tar.xz -C "$BLENDER_DIR" --strip-components=1; then
+    echo "[startup] Blender installed: $("$BLENDER_DIR/blender" --version 2>/dev/null | head -1)"
+  else
+    echo "[startup] Blender download/extract failed"
+    rm -rf "$BLENDER_DIR"/* 2>/dev/null
+  fi
+  rm -f /home/tmp/blender.tar.xz
+}
+
+# Runtime libraries are not persistent (container filesystem), so always run the apt step,
+# but only download Blender once.
+( install_blender > /home/LogFiles/blender-install.log 2>&1 ) &
+
+exec node apps/backend/dist/index.js
