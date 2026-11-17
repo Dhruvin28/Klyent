@@ -6,6 +6,23 @@
 BLENDER_VERSION="${BLENDER_VERSION:-4.2.3}"
 BLENDER_DIR="${BLENDER_DIR:-/home/blender}"
 
+# Blender's runtime libraries live in the container filesystem, which is wiped on every
+# restart/redeploy (unlike /home). Install them on EVERY boot, independent of the Blender files.
+install_libs() {
+  if ldconfig -p 2>/dev/null | grep -q 'libX11.so.6' && ldconfig -p 2>/dev/null | grep -q 'libGL.so.1' && ldconfig -p 2>/dev/null | grep -q 'libgomp.so.1'; then
+    echo "[startup] runtime libraries already present"; return 0
+  fi
+  echo "[startup] installing Blender runtime libraries"
+  for attempt in 1 2 3; do
+    if apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+      xz-utils libxi6 libxrender1 libxkbcommon0 libxxf86vm1 libxfixes3 libxext6 libx11-6 libsm6 libgl1 libegl1 libgomp1 ca-certificates; then
+      echo "[startup] runtime libraries installed"; return 0
+    fi
+    echo "[startup] apt attempt $attempt failed"; sleep 10
+  done
+  echo "[startup] runtime libraries install FAILED"
+}
+
 install_blender() {
   # Complete only if the marker exists AND Blender's bundled Python is present (a restart
   # mid-extract leaves the binary without its python/ folder).
@@ -25,9 +42,6 @@ install_blender() {
   rm -rf "$BLENDER_DIR"/* "$BLENDER_DIR"/.installed 2>/dev/null
   echo "[startup] installing Blender $BLENDER_VERSION into $BLENDER_DIR"
   mkdir -p "$BLENDER_DIR" /home/tmp
-  (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-    xz-utils libxi6 libxrender1 libxkbcommon0 libxxf86vm1 libxfixes3 libxext6 libx11-6 libsm6 libgl1 libegl1 libgomp1 ca-certificates) \
-    || echo "[startup] apt step failed (continuing)"
   MAJOR="${BLENDER_VERSION%.*}"
   URL="https://download.blender.org/release/Blender${MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
   echo "[startup] downloading $URL"
@@ -46,8 +60,7 @@ install_blender() {
   echo "[startup] Blender install failed after 3 attempts"
 }
 
-# Runtime libraries are not persistent (container filesystem), so always run the apt step,
-# but only download Blender once.
-( install_blender >> /home/LogFiles/blender-install.log 2>&1 ) &
+# Libraries first (every boot), then Blender itself (only if missing).
+( install_libs; install_blender ) >> /home/LogFiles/blender-install.log 2>&1 &
 
 exec node apps/backend/dist/index.js

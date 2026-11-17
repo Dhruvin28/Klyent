@@ -186,13 +186,18 @@ async function handleRenderView(ctx: JobContext) {
     if (!scene.meshes.length) throw new JobError('EMPTY_SCENE', 'The model has no geometry to render.')
     const sceneJson = path.join(dir, 'scene.json')
     await writeFile(sceneJson, JSON.stringify(scene))
-    const { width, height } = dims(view, manifest.quality.longSide)
+    // The photoreal pass outputs ~1536px anyway, so the Cycles reference only needs to be a clean
+    // geometric guide. Cap its cost: this keeps CPU-only hosts inside the time limit.
+    const guide = manifest.enhance !== false && config.interior.render.enhance && (view.group === 'perspective' || view.group === 'isometric')
+    const longSide = guide ? Math.min(manifest.quality.longSide, 1280) : manifest.quality.longSide
+    const samples = guide ? Math.min(manifest.quality.samples, 96) : manifest.quality.samples
+    const { width, height } = dims(view, longSide)
     const outPng = path.join(dir, 'render.png')
 
     await ctx.checkpoint({ stage: 'render', triangles: scene.stats.triangles, lights: scene.stats.lights })
     ctx.log.info({ view: viewKey, triangles: scene.stats.triangles, lights: scene.stats.lights, samples: manifest.quality.samples }, 'interior render: blender start')
     try {
-      await runBlender({ sceneJson, outPng, width, height, samples: manifest.quality.samples })
+      await runBlender({ sceneJson, outPng, width, height, samples })
     } catch (err) {
       if (err instanceof RenderError) throw new JobError(err.code, err.message, err.retryable)
       throw err

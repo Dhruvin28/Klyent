@@ -55,10 +55,15 @@ cy = scn.cycles
 cy.samples = samples
 cy.use_adaptive_sampling = True
 cy.adaptive_threshold = 0.01
-cy.max_bounces = 10
-cy.diffuse_bounces = 6
-cy.glossy_bounces = 6
-cy.transmission_bounces = 6
+cy.max_bounces = 8
+cy.diffuse_bounces = 4
+cy.glossy_bounces = 4
+cy.transmission_bounces = 4
+# Hard wall-clock budget per frame (seconds): Cycles stops sampling, then denoises what it has.
+try:
+    cy.time_limit = float(os.environ.get("BLENDER_TIME_LIMIT", "900"))
+except Exception:
+    pass
 cy.transparent_max_bounces = 16
 cy.sample_clamp_indirect = 8.0
 cy.caustics_reflective = False
