@@ -98,6 +98,14 @@ export const config = {
       imageQuality: process.env.INTERIOR_RENDER_IMAGE_QUALITY ?? 'high',
       verifyModel: process.env.INTERIOR_RENDER_VERIFY_MODEL ?? '',
       enhanceTimeoutMs: parseInt(process.env.INTERIOR_RENDER_ENHANCE_TIMEOUT_MS ?? String(10 * 60 * 1000)),
+      // 'guide' = built-in deterministic renderer (seconds, no Blender); 'cycles' = Blender Cycles
+      // (physically based, needs BLENDER_PATH and ideally a GPU host).
+      engine: (process.env.INTERIOR_RENDER_ENGINE ?? 'guide') === 'cycles' ? ('cycles' as const) : ('guide' as const),
+      // AI candidates generated per view in the first round, each audited before one is chosen.
+      candidates: Math.max(1, Math.min(4, parseInt(process.env.INTERIOR_RENDER_CANDIDATES ?? '2'))),
+      // A candidate must reach this audit score (0-100) and structural correlation to be accepted.
+      minScore: parseInt(process.env.INTERIOR_RENDER_MIN_SCORE ?? '85'),
+      minStructure: parseFloat(process.env.INTERIOR_RENDER_MIN_STRUCTURE ?? '0.5'),
     },
   },
   studioUpload: {

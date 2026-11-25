@@ -1,0 +1,1652 @@
+{
+ "sheet": {
+  "kind": "furniture_layout",
+  "title": "Furniture Layout — ALTERNATIVE - 3",
+  "scaleNote": "1\"=3'-6\"",
+  "unitsHint": "ft_in",
+  "notes": [
+   "Mixed sheet containing a living-room furniture plan and Elevation -A and Elevation -B.",
+   "Room size note: 18'1\" X 22'0\".",
+   "Elevation notes specify wooden laminate, reverse moulding, wooden moulding and wall color.",
+   "Groove note: 4 mm x 4 mm.",
+   "The elevation object below represents Elevation -B only.",
+   "Light coordinates refer to symbols in the elevations, not ceiling-plan positions."
+  ]
+ },
+ "walls": [
+  {
+   "id": "w1",
+   "a": {
+    "x": 328.90625,
+    "y": 870.3125
+   },
+   "b": {
+    "x": 328.90625,
+    "y": 1096.875
+   },
+   "thicknessPx": 64.0625,
+   "kind": "exterior",
+   "confidence": 0.96
+  },
+  {
+   "id": "w2",
+   "a": {
+    "x": 328.90625,
+    "y": 870.3125
+   },
+   "b": {
+    "x": 571.09375,
+    "y": 870.3125
+   },
+   "thicknessPx": 23.4375,
+   "kind": "interior",
+   "confidence": 0.74
+  },
+  {
+   "id": "w3",
+   "a": {
+    "x": 571.09375,
+    "y": 870.3125
+   },
+   "b": {
+    "x": 571.09375,
+    "y": 895.3125
+   },
+   "thicknessPx": 23.4375,
+   "kind": "interior",
+   "confidence": 0.91
+  },
+  {
+   "id": "w4",
+   "a": {
+    "x": 571.09375,
+    "y": 895.3125
+   },
+   "b": {
+    "x": 1157.8125,
+    "y": 895.3125
+   },
+   "thicknessPx": 26.5625,
+   "kind": "interior",
+   "confidence": 0.97
+  },
+  {
+   "id": "w5",
+   "a": {
+    "x": 1587.5,
+    "y": 908.59375
+   },
+   "b": {
+    "x": 1782.8125,
+    "y": 908.59375
+   },
+   "thicknessPx": 54.6875,
+   "kind": "exterior",
+   "confidence": 0.96
+  },
+  {
+   "id": "w6",
+   "a": {
+    "x": 1587.5,
+    "y": 908.59375
+   },
+   "b": {
+    "x": 1587.5,
+    "y": 1330.46875
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.95
+  },
+  {
+   "id": "w7",
+   "a": {
+    "x": 1587.5,
+    "y": 1330.46875
+   },
+   "b": {
+    "x": 1605.46875,
+    "y": 1330.46875
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.88
+  },
+  {
+   "id": "w8",
+   "a": {
+    "x": 1605.46875,
+    "y": 1330.46875
+   },
+   "b": {
+    "x": 1632.8125,
+    "y": 1330.46875
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.88
+  },
+  {
+   "id": "w9",
+   "a": {
+    "x": 1605.46875,
+    "y": 1330.46875
+   },
+   "b": {
+    "x": 1605.46875,
+    "y": 1728.125
+   },
+   "thicknessPx": 54.6875,
+   "kind": "exterior",
+   "confidence": 0.84
+  },
+  {
+   "id": "w10",
+   "a": {
+    "x": 1605.46875,
+    "y": 1728.125
+   },
+   "b": {
+    "x": 1587.5,
+    "y": 1728.125
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.81
+  },
+  {
+   "id": "w11",
+   "a": {
+    "x": 1587.5,
+    "y": 1728.125
+   },
+   "b": {
+    "x": 1587.5,
+    "y": 1910.9375
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.96
+  },
+  {
+   "id": "w12",
+   "a": {
+    "x": 1587.5,
+    "y": 1910.9375
+   },
+   "b": {
+    "x": 1035.9375,
+    "y": 1910.9375
+   },
+   "thicknessPx": 23.4375,
+   "kind": "exterior",
+   "confidence": 0.94
+  },
+  {
+   "id": "w13",
+   "a": {
+    "x": 1035.9375,
+    "y": 1910.9375
+   },
+   "b": {
+    "x": 328.90625,
+    "y": 1910.9375
+   },
+   "thicknessPx": 23.4375,
+   "kind": "exterior",
+   "confidence": 0.89
+  },
+  {
+   "id": "w14",
+   "a": {
+    "x": 328.90625,
+    "y": 1782.8125
+   },
+   "b": {
+    "x": 328.90625,
+    "y": 1910.9375
+   },
+   "thicknessPx": 64.0625,
+   "kind": "exterior",
+   "confidence": 0.96
+  },
+  {
+   "id": "w15",
+   "a": {
+    "x": 328.90625,
+    "y": 1910.9375
+   },
+   "b": {
+    "x": 328.90625,
+    "y": 2026.5625
+   },
+   "thicknessPx": 64.0625,
+   "kind": "exterior",
+   "confidence": 0.96
+  },
+  {
+   "id": "w16",
+   "a": {
+    "x": 351.5625,
+    "y": 1096.875
+   },
+   "b": {
+    "x": 351.5625,
+    "y": 1782.8125
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.68
+  },
+  {
+   "id": "w17",
+   "a": {
+    "x": 328.90625,
+    "y": 1096.875
+   },
+   "b": {
+    "x": 351.5625,
+    "y": 1096.875
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.66
+  },
+  {
+   "id": "w18",
+   "a": {
+    "x": 351.5625,
+    "y": 1782.8125
+   },
+   "b": {
+    "x": 328.90625,
+    "y": 1782.8125
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.78
+  },
+  {
+   "id": "w19",
+   "a": {
+    "x": 1035.9375,
+    "y": 1910.9375
+   },
+   "b": {
+    "x": 1035.9375,
+    "y": 2021.875
+   },
+   "thicknessPx": 23.4375,
+   "kind": "exterior",
+   "confidence": 0.95
+  },
+  {
+   "id": "w20",
+   "a": {
+    "x": 1035.9375,
+    "y": 2021.875
+   },
+   "b": {
+    "x": 1101.5625,
+    "y": 2021.875
+   },
+   "thicknessPx": 18.75,
+   "kind": "exterior",
+   "confidence": 0.95
+  }
+ ],
+ "openings": [
+  {
+   "wallRef": "w2",
+   "type": "door",
+   "center": {
+    "x": 460.15625,
+    "y": 870.3125
+   },
+   "widthPx": 198.4375,
+   "swing": "left",
+   "labelTextId": null,
+   "confidence": 0.96
+  },
+  {
+   "wallRef": null,
+   "type": "opening",
+   "center": {
+    "x": 1367.96875,
+    "y": 895.3125
+   },
+   "widthPx": 420.3125,
+   "swing": "none",
+   "labelTextId": null,
+   "confidence": 0.63
+  },
+  {
+   "wallRef": "w9",
+   "type": "opening",
+   "center": {
+    "x": 1605.46875,
+    "y": 1425
+   },
+   "widthPx": 171.875,
+   "swing": "none",
+   "labelTextId": null,
+   "confidence": 0.88
+  },
+  {
+   "wallRef": "w16",
+   "type": "opening",
+   "center": {
+    "x": 351.5625,
+    "y": 1182.03125
+   },
+   "widthPx": 170.3125,
+   "swing": "none",
+   "labelTextId": null,
+   "confidence": 0.49
+  },
+  {
+   "wallRef": "w13",
+   "type": "sliding_door",
+   "center": {
+    "x": 691.40625,
+    "y": 1910.9375
+   },
+   "widthPx": 551.5625,
+   "swing": "none",
+   "labelTextId": null,
+   "confidence": 0.91
+  },
+  {
+   "wallRef": "w12",
+   "type": "window",
+   "center": {
+    "x": 1312.5,
+    "y": 1910.9375
+   },
+   "widthPx": 421.875,
+   "swing": "none",
+   "labelTextId": null,
+   "confidence": 0.87
+  }
+ ],
+ "rooms": [
+  {
+   "label": "Living Room",
+   "polygon": [
+    {
+     "x": 328.90625,
+     "y": 870.3125
+    },
+    {
+     "x": 571.09375,
+     "y": 870.3125
+    },
+    {
+     "x": 571.09375,
+     "y": 895.3125
+    },
+    {
+     "x": 1587.5,
+     "y": 895.3125
+    },
+    {
+     "x": 1587.5,
+     "y": 1330.46875
+    },
+    {
+     "x": 1605.46875,
+     "y": 1330.46875
+    },
+    {
+     "x": 1605.46875,
+     "y": 1728.125
+    },
+    {
+     "x": 1587.5,
+     "y": 1728.125
+    },
+    {
+     "x": 1587.5,
+     "y": 1910.9375
+    },
+    {
+     "x": 328.90625,
+     "y": 1910.9375
+    },
+    {
+     "x": 328.90625,
+     "y": 1782.8125
+    },
+    {
+     "x": 351.5625,
+     "y": 1782.8125
+    },
+    {
+     "x": 351.5625,
+     "y": 1096.875
+    },
+    {
+     "x": 328.90625,
+     "y": 1096.875
+    }
+   ],
+   "labelTextId": "T67",
+   "ceilingHeightTextId": null
+  }
+ ],
+ "furniture": [
+  {
+   "label": "TV console",
+   "category": "tv_unit",
+   "center": {
+    "x": 886.71875,
+    "y": 944.53125
+   },
+   "widthPx": 542.1875,
+   "depthPx": 70.3125,
+   "rotationDeg": 0,
+   "sizeTextId": "T62",
+   "confidence": 0.98
+  },
+  {
+   "label": "Television on console",
+   "category": "appliance",
+   "center": {
+    "x": 865.625,
+    "y": 925
+   },
+   "widthPx": 159.375,
+   "depthPx": 18.75,
+   "rotationDeg": 0,
+   "sizeTextId": null,
+   "confidence": 0.96
+  },
+  {
+   "label": "Dining table",
+   "category": "dining_table",
+   "center": {
+    "x": 1439.0625,
+    "y": 1139.84375
+   },
+   "widthPx": 278.125,
+   "depthPx": 154.6875,
+   "rotationDeg": 0,
+   "sizeTextId": "T64",
+   "confidence": 0.99
+  },
+  {
+   "label": "Dining chair, upper left",
+   "category": "chair",
+   "center": {
+    "x": 1373.4375,
+    "y": 1021.09375
+   },
+   "widthPx": 81.25,
+   "depthPx": 79.6875,
+   "rotationDeg": 0,
+   "sizeTextId": null,
+   "confidence": 0.98
+  },
+  {
+   "label": "Dining chair, upper right",
+   "category": "chair",
+   "center": {
+    "x": 1496.875,
+    "y": 1021.09375
+   },
+   "widthPx": 82.8125,
+   "depthPx": 79.6875,
+   "rotationDeg": 0,
+   "sizeTextId": null,
+   "confidence": 0.98
+  },
+  {
+   "label": "Dining chair, lower left",
+   "category": "chair",
+   "center": {
+    "x": 1377.34375,
+    "y": 1258.59375
+   },
+   "widthPx": 79.6875,
+   "depthPx": 82.8125,
+   "rotationDeg": 180,
+   "sizeTextId": null,
+   "confidence": 0.98
+  },
+  {
+   "label": "Dining chair, lower right",
+   "category": "chair",
+   "center": {
+    "x": 1501.5625,
+    "y": 1258.59375
+   },
+   "widthPx": 81.25,
+   "depthPx": 82.8125,
+   "rotationDeg": 180,
+   "sizeTextId": null,
+   "confidence": 0.98
+  },
+  {
+   "label": "Dining chair, left end",
+   "category": "chair",
+   "center": {
+    "x": 1264.0625,
+    "y": 1139.84375
+   },
+   "widthPx": 79.6875,
+   "depthPx": 79.6875,
+   "rotationDeg": 270,
+   "sizeTextId": null,
+   "confidence": 0.98
+  },
+  {
+   "label": "Left three-seat sofa",
+   "category": "sofa",
+   "center": {
+    "x": 467.96875,
+    "y": 1465.625
+   },
+   "widthPx": 387.5,
+   "depthPx": 173.4375,
+   "rotationDeg": 270,
+   "sizeTextId": "T68",
+   "confidence": 0.99
+  },
+  {
+   "label": "Lower three-seat sofa",
+   "category": "sofa",
+   "center": {
+    "x": 1172.65625,
+    "y": 1773.4375
+   },
+   "widthPx": 389.0625,
+   "depthPx": 168.75,
+   "rotationDeg": 180,
+   "sizeTextId": "T82",
+   "confidence": 0.99
+  },
+  {
+   "label": "Lower-left armchair",
+   "category": "armchair",
+   "center": {
+    "x": 655.46875,
+    "y": 1774.21875
+   },
+   "widthPx": 167.1875,
+   "depthPx": 170.3125,
+   "rotationDeg": 180,
+   "sizeTextId": "T80",
+   "confidence": 0.99
+  },
+  {
+   "label": "Right armchair",
+   "category": "armchair",
+   "center": {
+    "x": 1479.6875,
+    "y": 1594.53125
+   },
+   "widthPx": 167.1875,
+   "depthPx": 171.875,
+   "rotationDeg": 90,
+   "sizeTextId": "T75",
+   "confidence": 0.99
+  },
+  {
+   "label": "Long rectangular coffee table",
+   "category": "coffee_table",
+   "center": {
+    "x": 888.28125,
+    "y": 1496.875
+   },
+   "widthPx": 250,
+   "depthPx": 85.9375,
+   "rotationDeg": 270,
+   "sizeTextId": "T69",
+   "confidence": 0.88
+  },
+  {
+   "label": "Left organic nesting table, larger",
+   "category": "coffee_table",
+   "center": {
+    "x": 684.375,
+    "y": 1485.9375
+   },
+   "widthPx": 104.6875,
+   "depthPx": 103.125,
+   "rotationDeg": 0,
+   "sizeTextId": null,
+   "confidence": 0.69
+  },
+  {
+   "label": "Left organic nesting table, smaller",
+   "category": "coffee_table",
+   "center": {
+    "x": 687.5,
+    "y": 1554.6875
+   },
+   "widthPx": 76.5625,
+   "depthPx": 73.4375,
+   "rotationDeg": 0,
+   "sizeTextId": null,
+   "confidence": 0.69
+  },
+  {
+   "label": "Right organic nesting table, larger",
+   "category": "coffee_table",
+   "center": {
+    "x": 1160.9375,
+    "y": 1568.75
+   },
+   "widthPx": 101.5625,
+   "depthPx": 103.125,
+   "rotationDeg": 270,
+   "sizeTextId": null,
+   "confidence": 0.72
+  },
+  {
+   "label": "Right organic nesting table, smaller",
+   "category": "coffee_table",
+   "center": {
+    "x": 1231.25,
+    "y": 1570.3125
+   },
+   "widthPx": 75,
+   "depthPx": 73.4375,
+   "rotationDeg": 270,
+   "sizeTextId": null,
+   "confidence": 0.72
+  },
+  {
+   "label": "Round side table, lower left",
+   "category": "side_table",
+   "center": {
+    "x": 470.3125,
+    "y": 1781.25
+   },
+   "widthPx": 98.4375,
+   "depthPx": 98.4375,
+   "rotationDeg": 0,
+   "sizeTextId": null,
+   "confidence": 0.95
+  },
+  {
+   "label": "Round side table, lower right",
+   "category": "side_table",
+   "center": {
+    "x": 1462.5,
+    "y": 1781.25
+   },
+   "widthPx": 98.4375,
+   "depthPx": 98.4375,
+   "rotationDeg": 0,
+   "sizeTextId": null,
+   "confidence": 0.95
+  }
+ ],
+ "dimensions": [
+  {
+   "textId": "T7",
+   "readText": "6\"",
+   "p1": {
+    "x": 278.125,
+    "y": 335.9375
+   },
+   "p2": {
+    "x": 278.125,
+    "y": 364.0625
+   },
+   "confidence": 0.51
+  },
+  {
+   "textId": "T17",
+   "readText": "Lintel Lvl ref",
+   "p1": {
+    "x": 250,
+    "y": 335.9375
+   },
+   "p2": {
+    "x": 250,
+    "y": 739.0625
+   },
+   "confidence": 0.7
+  },
+  {
+   "textId": "T18",
+   "readText": "R",
+   "p1": {
+    "x": 278.125,
+    "y": 364.0625
+   },
+   "p2": {
+    "x": 278.125,
+    "y": 696.875
+   },
+   "confidence": 0.48
+  },
+  {
+   "textId": "T36",
+   "readText": "6\"",
+   "p1": {
+    "x": 278.125,
+    "y": 696.875
+   },
+   "p2": {
+    "x": 278.125,
+    "y": 725
+   },
+   "confidence": 0.51
+  },
+  {
+   "textId": "T42",
+   "readText": "6\"",
+   "p1": {
+    "x": 381.25,
+    "y": 751.5625
+   },
+   "p2": {
+    "x": 412.5,
+    "y": 751.5625
+   },
+   "confidence": 0.78
+  },
+  {
+   "textId": "T43",
+   "readText": "6\"",
+   "p1": {
+    "x": 429.6875,
+    "y": 751.5625
+   },
+   "p2": {
+    "x": 459.375,
+    "y": 751.5625
+   },
+   "confidence": 0.78
+  },
+  {
+   "textId": "T52",
+   "readText": "Ceiling ref",
+   "p1": {
+    "x": 364.0625,
+    "y": 773.4375
+   },
+   "p2": {
+    "x": 478.125,
+    "y": 773.4375
+   },
+   "confidence": 0.77
+  },
+  {
+   "textId": "T53",
+   "readText": "2'",
+   "p1": {
+    "x": 478.125,
+    "y": 773.4375
+   },
+   "p2": {
+    "x": 592.1875,
+    "y": 773.4375
+   },
+   "confidence": 0.92
+  },
+  {
+   "textId": "T54",
+   "readText": "3\"",
+   "p1": {
+    "x": 878.125,
+    "y": 781.25
+   },
+   "p2": {
+    "x": 892.1875,
+    "y": 781.25
+   },
+   "confidence": 0.72
+  },
+  {
+   "textId": "T55",
+   "readText": "3\"",
+   "p1": {
+    "x": 896.875,
+    "y": 781.25
+   },
+   "p2": {
+    "x": 910.9375,
+    "y": 781.25
+   },
+   "confidence": 0.72
+  },
+  {
+   "textId": "T56",
+   "readText": "3\"",
+   "p1": {
+    "x": 915.625,
+    "y": 781.25
+   },
+   "p2": {
+    "x": 929.6875,
+    "y": 781.25
+   },
+   "confidence": 0.72
+  },
+  {
+   "textId": "T57",
+   "readText": "9\"",
+   "p1": {
+    "x": 929.6875,
+    "y": 781.25
+   },
+   "p2": {
+    "x": 971.875,
+    "y": 781.25
+   },
+   "confidence": 0.83
+  },
+  {
+   "textId": "T60",
+   "readText": "1\"",
+   "p1": {
+    "x": 892.1875,
+    "y": 818.75
+   },
+   "p2": {
+    "x": 896.875,
+    "y": 818.75
+   },
+   "confidence": 0.6
+  },
+  {
+   "textId": "T61",
+   "readText": "1\"",
+   "p1": {
+    "x": 910.9375,
+    "y": 818.75
+   },
+   "p2": {
+    "x": 915.625,
+    "y": 818.75
+   },
+   "confidence": 0.6
+  },
+  {
+   "textId": "T22",
+   "readText": "9\"",
+   "p1": {
+    "x": 2434.375,
+    "y": 587.5
+   },
+   "p2": {
+    "x": 2476.5625,
+    "y": 587.5
+   },
+   "confidence": 0.89
+  },
+  {
+   "textId": "T25",
+   "readText": "8'-4\"",
+   "p1": {
+    "x": 2040.625,
+    "y": 635.9375
+   },
+   "p2": {
+    "x": 2503.125,
+    "y": 635.9375
+   },
+   "confidence": 0.97
+  },
+  {
+   "textId": "T26",
+   "readText": "Eq",
+   "p1": {
+    "x": 2040.625,
+    "y": 675
+   },
+   "p2": {
+    "x": 2132.8125,
+    "y": 675
+   },
+   "confidence": 0.87
+  },
+  {
+   "textId": "T27",
+   "readText": "Eq",
+   "p1": {
+    "x": 2132.8125,
+    "y": 675
+   },
+   "p2": {
+    "x": 2225,
+    "y": 675
+   },
+   "confidence": 0.87
+  },
+  {
+   "textId": "T28",
+   "readText": "Eq",
+   "p1": {
+    "x": 2315.625,
+    "y": 675
+   },
+   "p2": {
+    "x": 2407.8125,
+    "y": 675
+   },
+   "confidence": 0.87
+  },
+  {
+   "textId": "T29",
+   "readText": "Eq",
+   "p1": {
+    "x": 2407.8125,
+    "y": 675
+   },
+   "p2": {
+    "x": 2503.125,
+    "y": 675
+   },
+   "confidence": 0.87
+  },
+  {
+   "textId": "T38",
+   "readText": "9\"",
+   "p1": {
+    "x": 1775,
+    "y": 723.4375
+   },
+   "p2": {
+    "x": 1818.75,
+    "y": 723.4375
+   },
+   "confidence": 0.85
+  },
+  {
+   "textId": "T39",
+   "readText": "1'",
+   "p1": {
+    "x": 1818.75,
+    "y": 723.4375
+   },
+   "p2": {
+    "x": 1875,
+    "y": 723.4375
+   },
+   "confidence": 0.83
+  },
+  {
+   "textId": "T40",
+   "readText": "3\"",
+   "p1": {
+    "x": 1875,
+    "y": 723.4375
+   },
+   "p2": {
+    "x": 1889.0625,
+    "y": 723.4375
+   },
+   "confidence": 0.67
+  },
+  {
+   "textId": "T41",
+   "readText": "3\"",
+   "p1": {
+    "x": 1893.75,
+    "y": 723.4375
+   },
+   "p2": {
+    "x": 1907.8125,
+    "y": 723.4375
+   },
+   "confidence": 0.67
+  },
+  {
+   "textId": "T45",
+   "readText": "1\"",
+   "p1": {
+    "x": 1889.0625,
+    "y": 757.8125
+   },
+   "p2": {
+    "x": 1893.75,
+    "y": 757.8125
+   },
+   "confidence": 0.58
+  },
+  {
+   "textId": "T46",
+   "readText": "1\"",
+   "p1": {
+    "x": 1907.8125,
+    "y": 757.8125
+   },
+   "p2": {
+    "x": 1912.5,
+    "y": 757.8125
+   },
+   "confidence": 0.58
+  },
+  {
+   "textId": "T47",
+   "readText": "9\"",
+   "p1": {
+    "x": 1971.875,
+    "y": 757.8125
+   },
+   "p2": {
+    "x": 2014.0625,
+    "y": 757.8125
+   },
+   "confidence": 0.86
+  },
+  {
+   "textId": "T48",
+   "readText": "3\"",
+   "p1": {
+    "x": 2014.0625,
+    "y": 757.8125
+   },
+   "p2": {
+    "x": 2028.125,
+    "y": 757.8125
+   },
+   "confidence": 0.76
+  },
+  {
+   "textId": "T49",
+   "readText": "3\"",
+   "p1": {
+    "x": 2032.8125,
+    "y": 757.8125
+   },
+   "p2": {
+    "x": 2046.875,
+    "y": 757.8125
+   },
+   "confidence": 0.76
+  },
+  {
+   "textId": "T50",
+   "readText": "3\"",
+   "p1": {
+    "x": 2051.5625,
+    "y": 757.8125
+   },
+   "p2": {
+    "x": 2065.625,
+    "y": 757.8125
+   },
+   "confidence": 0.76
+  },
+  {
+   "textId": "T58",
+   "readText": "1\"",
+   "p1": {
+    "x": 2028.125,
+    "y": 793.75
+   },
+   "p2": {
+    "x": 2032.8125,
+    "y": 793.75
+   },
+   "confidence": 0.64
+  },
+  {
+   "textId": "T59",
+   "readText": "1\"",
+   "p1": {
+    "x": 2046.875,
+    "y": 793.75
+   },
+   "p2": {
+    "x": 2051.5625,
+    "y": 793.75
+   },
+   "confidence": 0.64
+  },
+  {
+   "textId": "T62",
+   "readText": "1'-3\"",
+   "p1": {
+    "x": 600,
+    "y": 910.9375
+   },
+   "p2": {
+    "x": 600,
+    "y": 979.6875
+   },
+   "confidence": 0.96
+  },
+  {
+   "textId": "T63",
+   "readText": "1'",
+   "p1": {
+    "x": 559.375,
+    "y": 1012.5
+   },
+   "p2": {
+    "x": 615.625,
+    "y": 1012.5
+   },
+   "confidence": 0.96
+  },
+  {
+   "textId": "T64",
+   "readText": "5'",
+   "p1": {
+    "x": 1300,
+    "y": 1093.75
+   },
+   "p2": {
+    "x": 1578.125,
+    "y": 1093.75
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T65",
+   "readText": "2'-9\"",
+   "p1": {
+    "x": 1326.5625,
+    "y": 1062.5
+   },
+   "p2": {
+    "x": 1326.5625,
+    "y": 1217.1875
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T68",
+   "readText": "7'",
+   "p1": {
+    "x": 514.0625,
+    "y": 1271.875
+   },
+   "p2": {
+    "x": 514.0625,
+    "y": 1659.375
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T69",
+   "readText": "4'-6\"",
+   "p1": {
+    "x": 818.75,
+    "y": 1371.875
+   },
+   "p2": {
+    "x": 818.75,
+    "y": 1621.875
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T70",
+   "readText": "3'-1\"",
+   "p1": {
+    "x": 1393.75,
+    "y": 1487.5
+   },
+   "p2": {
+    "x": 1565.625,
+    "y": 1487.5
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T71",
+   "readText": "2'-9 1/2\"",
+   "p1": {
+    "x": 1109.375,
+    "y": 1498.4375
+   },
+   "p2": {
+    "x": 1267.1875,
+    "y": 1498.4375
+   },
+   "confidence": 0.94
+  },
+  {
+   "textId": "T74",
+   "readText": "1'-10 1/2\"",
+   "p1": {
+    "x": 1095.3125,
+    "y": 1517.1875
+   },
+   "p2": {
+    "x": 1095.3125,
+    "y": 1621.875
+   },
+   "confidence": 0.93
+  },
+  {
+   "textId": "T75",
+   "readText": "3'",
+   "p1": {
+    "x": 1379.6875,
+    "y": 1510.9375
+   },
+   "p2": {
+    "x": 1379.6875,
+    "y": 1678.125
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T76",
+   "readText": "1'-6\"",
+   "p1": {
+    "x": 845.3125,
+    "y": 1637.5
+   },
+   "p2": {
+    "x": 931.25,
+    "y": 1637.5
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T77",
+   "readText": "3'-1\"",
+   "p1": {
+    "x": 381.25,
+    "y": 1678.125
+   },
+   "p2": {
+    "x": 554.6875,
+    "y": 1678.125
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T78",
+   "readText": "3'-1\"",
+   "p1": {
+    "x": 760.9375,
+    "y": 1689.0625
+   },
+   "p2": {
+    "x": 760.9375,
+    "y": 1859.375
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T79",
+   "readText": "4'-4 1/4\"",
+   "p1": {
+    "x": 739.0625,
+    "y": 1768.75
+   },
+   "p2": {
+    "x": 978.125,
+    "y": 1768.75
+   },
+   "confidence": 0.94
+  },
+  {
+   "textId": "T80",
+   "readText": "3'",
+   "p1": {
+    "x": 571.875,
+    "y": 1768.75
+   },
+   "p2": {
+    "x": 739.0625,
+    "y": 1768.75
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T82",
+   "readText": "7'",
+   "p1": {
+    "x": 978.125,
+    "y": 1768.75
+   },
+   "p2": {
+    "x": 1367.1875,
+    "y": 1768.75
+   },
+   "confidence": 0.99
+  },
+  {
+   "textId": "T83",
+   "readText": "3'",
+   "p1": {
+    "x": 1379.6875,
+    "y": 1689.0625
+   },
+   "p2": {
+    "x": 1379.6875,
+    "y": 1857.8125
+   },
+   "confidence": 0.99
+  }
+ ],
+ "ceilingZones": [],
+ "lights": [
+  {
+   "kind": "pendant",
+   "at": {
+    "x": 509.375,
+    "y": 446.875
+   },
+   "labelTextId": null
+  },
+  {
+   "kind": "pendant",
+   "at": {
+    "x": 539.0625,
+    "y": 479.6875
+   },
+   "labelTextId": null
+  },
+  {
+   "kind": "wall_light",
+   "at": {
+    "x": 396.875,
+    "y": 529.6875
+   },
+   "labelTextId": "T19"
+  },
+  {
+   "kind": "wall_light",
+   "at": {
+    "x": 443.75,
+    "y": 529.6875
+   },
+   "labelTextId": "T19"
+  },
+  {
+   "kind": "wall_light",
+   "at": {
+    "x": 1950,
+    "y": 512.5
+   },
+   "labelTextId": null
+  },
+  {
+   "kind": "strip",
+   "at": {
+    "x": 2454.6875,
+    "y": 370.3125
+   },
+   "labelTextId": "T20"
+  },
+  {
+   "kind": "strip",
+   "at": {
+    "x": 2454.6875,
+    "y": 465.625
+   },
+   "labelTextId": "T20"
+  },
+  {
+   "kind": "strip",
+   "at": {
+    "x": 2454.6875,
+    "y": 562.5
+   },
+   "labelTextId": "T20"
+  },
+  {
+   "kind": "pendant",
+   "at": {
+    "x": 2846.875,
+    "y": 495.3125
+   },
+   "labelTextId": null
+  },
+  {
+   "kind": "pendant",
+   "at": {
+    "x": 2896.875,
+    "y": 495.3125
+   },
+   "labelTextId": null
+  },
+  {
+   "kind": "pendant",
+   "at": {
+    "x": 2946.875,
+    "y": 495.3125
+   },
+   "labelTextId": null
+  }
+ ],
+ "elevation": {
+  "title": "Elevation -B",
+  "wallHint": null,
+  "leftX": 1773.4375,
+  "rightX": 2990.625,
+  "floorY": 739.0625,
+  "ceilingY": 225,
+  "features": [
+   {
+    "kind": "other",
+    "x0": 1773.4375,
+    "x1": 2990.625,
+    "yTop": 225,
+    "yBottom": 276.5625,
+    "divisions": null,
+    "label": "Upper horizontal wall/header band"
+   },
+   {
+    "kind": "door",
+    "x0": 1775,
+    "x1": 1971.875,
+    "yTop": 279.6875,
+    "yBottom": 739.0625,
+    "divisions": null,
+    "label": "Wood-laminate door/panel at left"
+   },
+   {
+    "kind": "panel",
+    "x0": 1818.75,
+    "x1": 1912.5,
+    "yTop": 284.375,
+    "yBottom": 739.0625,
+    "divisions": null,
+    "label": "Vertical wooden moulding and reverse moulding on left door/panel"
+   },
+   {
+    "kind": "panel",
+    "x0": 1971.875,
+    "x1": 2014.0625,
+    "yTop": 276.5625,
+    "yBottom": 739.0625,
+    "divisions": null,
+    "label": "Plain strip adjoining left door/panel"
+   },
+   {
+    "kind": "panel",
+    "x0": 2014.0625,
+    "x1": 2065.625,
+    "yTop": 276.5625,
+    "yBottom": 654.6875,
+    "divisions": 3,
+    "label": "Reverse Moulding"
+   },
+   {
+    "kind": "panel",
+    "x0": 2065.625,
+    "x1": 2434.375,
+    "yTop": 276.5625,
+    "yBottom": 654.6875,
+    "divisions": null,
+    "label": "TV backing panel, Lvl +1\""
+   },
+   {
+    "kind": "panel",
+    "x0": 2434.375,
+    "x1": 2476.5625,
+    "yTop": 276.5625,
+    "yBottom": 654.6875,
+    "divisions": null,
+    "label": "Wood-laminate shelf backing, Lvl +0\""
+   },
+   {
+    "kind": "panel",
+    "x0": 2476.5625,
+    "x1": 2570.3125,
+    "yTop": 276.5625,
+    "yBottom": 739.0625,
+    "divisions": null,
+    "label": "Plain wall field to right of shelf backing"
+   },
+   {
+    "kind": "other",
+    "x0": 2090.625,
+    "x1": 2400,
+    "yTop": 426.5625,
+    "yBottom": 606.25,
+    "divisions": null,
+    "label": "Television"
+   },
+   {
+    "kind": "shelf",
+    "x0": 2426.5625,
+    "x1": 2482.8125,
+    "yTop": 365.625,
+    "yBottom": 373.4375,
+    "divisions": null,
+    "label": "Upper display shelf with profile light"
+   },
+   {
+    "kind": "shelf",
+    "x0": 2426.5625,
+    "x1": 2482.8125,
+    "yTop": 460.9375,
+    "yBottom": 468.75,
+    "divisions": null,
+    "label": "Middle display shelf with profile light"
+   },
+   {
+    "kind": "shelf",
+    "x0": 2426.5625,
+    "x1": 2482.8125,
+    "yTop": 556.25,
+    "yBottom": 564.0625,
+    "divisions": null,
+    "label": "Lower display shelf with profile light"
+   },
+   {
+    "kind": "shelf",
+    "x0": 2040.625,
+    "x1": 2503.125,
+    "yTop": 654.6875,
+    "yBottom": 664.0625,
+    "divisions": null,
+    "label": "TV console top"
+   },
+   {
+    "kind": "tv_unit",
+    "x0": 2040.625,
+    "x1": 2503.125,
+    "yTop": 664.0625,
+    "yBottom": 721.875,
+    "divisions": 5,
+    "label": "Wood-laminate console: four drawers and central flip shutter"
+   },
+   {
+    "kind": "panel",
+    "x0": 2570.3125,
+    "x1": 2990.625,
+    "yTop": 276.5625,
+    "yBottom": 739.0625,
+    "divisions": null,
+    "label": "Right-hand wood-framed wall/panel"
+   },
+   {
+    "kind": "base_cabinet",
+    "x0": 2823.4375,
+    "x1": 2979.6875,
+    "yTop": 543.75,
+    "yBottom": 739.0625,
+    "divisions": null,
+    "label": "Brown rectangular unit below pendant lights"
+   }
+  ],
+  "heightDimensions": []
+ },
+ "sectionLevels": [],
+ "issues": [
+  {
+   "kind": "unsupported",
+   "message": "The sheet contains two elevations, but the schema permits only one elevation object. Elevation -B is encoded; Elevation -A, approximately x190–868 and y124–473, is not encoded as elevation features. Its dimension annotations and light symbols are included.",
+   "at": {
+    "x": 826.5625,
+    "y": 467.1875
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "The upper plan boundary between the end of the TV wall and the right pier contains dashed lines and a short shaded strip. An open passage is recorded without a host wall; the shaded strip may be overhead construction rather than a full-height wall.",
+   "at": {
+    "x": 1367.1875,
+    "y": 895.3125
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "At the upper part of the left plan boundary, solid wall lines are interrupted between approximately y702 and y811. No clear door or glazing symbol identifies this gap; its classification as an opening is provisional.",
+   "at": {
+    "x": 351.5625,
+    "y": 1181.25
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "The bottom-right opening is drawn with parallel frame lines but has no opening tag. It is recorded as a window; fixed glazing versus another glazed opening is not explicitly identified.",
+   "at": {
+    "x": 1312.5,
+    "y": 1910.9375
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "The paired organic brown objects appear to be nesting coffee tables. They could instead represent sculptural occasional seating; their footprints are visible, but their function and front orientation are not labeled.",
+   "at": {
+    "x": 1187.5,
+    "y": 1568.75
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "Elevation -A's left vertical dimension chain is crowded. The 6-inch labels and R are readable, but their individual extension-line endpoints are less certain than the main lintel-reference extent.",
+   "at": {
+    "x": 278.125,
+    "y": 529.6875
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "The 1-inch and 3-inch moulding dimensions below both elevations have overlapping ticks, leaders and text. Their endpoint associations should be checked in the vector source.",
+   "at": {
+    "x": 2028.125,
+    "y": 770.3125
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "Fractional dimension text is split across supplied tokens: T71/T72 form 2'-9 1/2\", T74/T73 form 1'-10 1/2\", and T79/T81 form 4'-4 1/4\". Each dimension references its principal token.",
+   "at": {
+    "x": 1182.8125,
+    "y": 1496.875
+   }
+  },
+  {
+   "kind": "ambiguous",
+   "message": "Elevation -B's left wood-finished element is recorded as a door/panel, and the brown element beneath the right pendants as a base cabinet. Neither is explicitly named on the elevation.",
+   "at": {
+    "x": 1871.875,
+    "y": 507.8125
+   }
+  },
+  {
+   "kind": "missing",
+   "message": "No explicit numeric overall ceiling height, opening heights or comprehensive wall-thickness dimensions are provided. Lvl +0\" and Lvl +1\" on Elevation -B indicate local panel offsets, not ceiling heights.",
+   "at": null
+  }
+ ],
+ "rejectedRefs": []
+}

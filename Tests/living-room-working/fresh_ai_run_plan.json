@@ -1,0 +1,1128 @@
+{
+ "version": 1,
+ "wallHeight": 2700,
+ "walls": [
+  {
+   "id": "page-1:w1",
+   "a": {
+    "x": 1816.602,
+    "y": 4800.396
+   },
+   "b": {
+    "x": 1816.602,
+    "y": 6050.051
+   },
+   "thickness": 350.338,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w2",
+   "a": {
+    "x": 1816.602,
+    "y": 4800.396
+   },
+   "b": {
+    "x": 3154.823,
+    "y": 4800.396
+   },
+   "thickness": 129.275,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w3",
+   "a": {
+    "x": 3154.823,
+    "y": 4800.396
+   },
+   "b": {
+    "x": 3154.823,
+    "y": 4943.267
+   },
+   "thickness": 124.486,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w4",
+   "a": {
+    "x": 3154.823,
+    "y": 4943.267
+   },
+   "b": {
+    "x": 6386.165,
+    "y": 4943.267
+   },
+   "thickness": 152.94,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w5",
+   "a": {
+    "x": 8753.121,
+    "y": 5017.069
+   },
+   "b": {
+    "x": 9833.487,
+    "y": 5017.069
+   },
+   "thickness": 300.544,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w6",
+   "a": {
+    "x": 8753.121,
+    "y": 5017.069
+   },
+   "b": {
+    "x": 8753.121,
+    "y": 7342.284
+   },
+   "thickness": 99.589,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w7",
+   "a": {
+    "x": 8753.121,
+    "y": 7342.284
+   },
+   "b": {
+    "x": 8852.71,
+    "y": 7342.284
+   },
+   "thickness": 99.589,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w9",
+   "a": {
+    "x": 8852.71,
+    "y": 7342.284
+   },
+   "b": {
+    "x": 8852.71,
+    "y": 9531.846
+   },
+   "thickness": 298.766,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w10",
+   "a": {
+    "x": 8852.71,
+    "y": 9531.846
+   },
+   "b": {
+    "x": 8753.121,
+    "y": 9531.846
+   },
+   "thickness": 103.42,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w11",
+   "a": {
+    "x": 8753.121,
+    "y": 9531.846
+   },
+   "b": {
+    "x": 8753.121,
+    "y": 10545.122
+   },
+   "thickness": 99.589,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w12",
+   "a": {
+    "x": 8753.121,
+    "y": 10545.122
+   },
+   "b": {
+    "x": 5714.781,
+    "y": 10545.122
+   },
+   "thickness": 124.485,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w13",
+   "a": {
+    "x": 5714.781,
+    "y": 10574.465
+   },
+   "b": {
+    "x": 1816.602,
+    "y": 10574.465
+   },
+   "thickness": 65.799,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w14",
+   "a": {
+    "x": 1816.602,
+    "y": 9833.487
+   },
+   "b": {
+    "x": 1816.602,
+    "y": 10574.465
+   },
+   "thickness": 350.338,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w15",
+   "a": {
+    "x": 1816.602,
+    "y": 10574.465
+   },
+   "b": {
+    "x": 1816.602,
+    "y": 11177.943
+   },
+   "thickness": 350.338,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w16",
+   "a": {
+    "x": 1941.977,
+    "y": 6050.051
+   },
+   "b": {
+    "x": 1941.977,
+    "y": 9833.487
+   },
+   "thickness": 99.589,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w17",
+   "a": {
+    "x": 1816.602,
+    "y": 6050.051
+   },
+   "b": {
+    "x": 1941.977,
+    "y": 6050.051
+   },
+   "thickness": 103.42,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w18",
+   "a": {
+    "x": 1941.977,
+    "y": 9833.487
+   },
+   "b": {
+    "x": 1816.602,
+    "y": 9833.487
+   },
+   "thickness": 103.42,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w19",
+   "a": {
+    "x": 5714.781,
+    "y": 10545.122
+   },
+   "b": {
+    "x": 5714.781,
+    "y": 11156.88
+   },
+   "thickness": 126.264,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  },
+  {
+   "id": "page-1:w20",
+   "a": {
+    "x": 5714.781,
+    "y": 11156.88
+   },
+   "b": {
+    "x": 6075.906,
+    "y": 11156.88
+   },
+   "thickness": 99.589,
+   "height": null,
+   "left": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   },
+   "right": {
+    "kind": "color",
+    "hex": "#f1ede6",
+    "roughness": 0.92,
+    "pattern": "plaster"
+   }
+  }
+ ],
+ "openings": [
+  {
+   "id": "page-1:opening-1",
+   "wallId": "page-1:w2",
+   "type": "door",
+   "offset": 725.573,
+   "width": 1100.809,
+   "height": 2100,
+   "sill": 0,
+   "flip": false
+  },
+  {
+   "id": "page-1:opening-2",
+   "wallId": "page-1:w4",
+   "type": "opening",
+   "offset": 2072.18,
+   "width": 2318.324,
+   "height": 2100,
+   "sill": 0,
+   "flip": false
+  },
+  {
+   "id": "page-1:opening-3",
+   "wallId": "page-1:w9",
+   "type": "opening",
+   "offset": 524.618,
+   "width": 949.648,
+   "height": 2100,
+   "sill": 0,
+   "flip": false
+  },
+  {
+   "id": "page-1:opening-4",
+   "wallId": "page-1:w16",
+   "type": "opening",
+   "offset": 476.852,
+   "width": 940.756,
+   "height": 2100,
+   "sill": 0,
+   "flip": false
+  },
+  {
+   "id": "page-1:opening-5",
+   "wallId": "page-1:w13",
+   "type": "door",
+   "offset": 1893.071,
+   "width": 3051.677,
+   "height": 2100,
+   "sill": 0,
+   "flip": false
+  },
+  {
+   "id": "page-1:opening-6",
+   "wallId": "page-1:w12",
+   "type": "window",
+   "offset": 1513.39,
+   "width": 2326.104,
+   "height": 1200,
+   "sill": 900,
+   "flip": false
+  }
+ ],
+ "rooms": [],
+ "items": [
+  {
+   "id": "page-1:item-1",
+   "name": "TV console",
+   "source": {
+    "kind": "parametric",
+    "type": "tv_unit"
+   },
+   "x": 4891.398,
+   "y": 5210.022,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 2989.434,
+   "depth": 380.57,
+   "height": 450,
+   "params": {},
+   "materials": {
+    "shutter": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    },
+    "carcass": {
+     "kind": "color",
+     "hex": "#5e3d28",
+     "roughness": 0.45,
+     "pattern": "wood"
+    },
+    "handle": {
+     "kind": "color",
+     "hex": "#8a8a8f",
+     "roughness": 0.3,
+     "metalness": 0.9
+    }
+   }
+  },
+  {
+   "id": "page-1:item-2",
+   "name": "Television on console",
+   "source": {
+    "kind": "parametric",
+    "type": "box"
+   },
+   "x": 4774.541,
+   "y": 5109.544,
+   "elevation": 450,
+   "rotation": 0,
+   "width": 879.067,
+   "depth": 101.367,
+   "height": 600,
+   "params": {},
+   "materials": {
+    "body": {
+     "kind": "color",
+     "hex": "#0d0d0f",
+     "roughness": 0.15,
+     "metalness": 0.3
+    }
+   }
+  },
+  {
+   "id": "page-1:item-3",
+   "name": "Dining table",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 7940.407,
+   "y": 6286.823,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 1525.839,
+   "depth": 837.61,
+   "height": 750,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-4",
+   "name": "Dining chair, upper left",
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "x": 7578.51,
+   "y": 5625.041,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 407.246,
+   "depth": 425.489,
+   "height": 880,
+   "params": {},
+   "materials": {
+    "seat": {
+     "kind": "color",
+     "hex": "#cdbfa8",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    }
+   }
+  },
+  {
+   "id": "page-1:item-5",
+   "name": "Dining chair, upper right",
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "x": 8253.4,
+   "y": 5625.041,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 405.467,
+   "depth": 425.489,
+   "height": 880,
+   "params": {},
+   "materials": {
+    "seat": {
+     "kind": "color",
+     "hex": "#cdbfa8",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    }
+   }
+  },
+  {
+   "id": "page-1:item-6",
+   "name": "Dining chair, lower left",
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "x": 7603.407,
+   "y": 6938.029,
+   "elevation": 0,
+   "rotation": 180,
+   "width": 407.246,
+   "depth": 464.802,
+   "height": 880,
+   "params": {},
+   "materials": {
+    "seat": {
+     "kind": "color",
+     "hex": "#cdbfa8",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    }
+   }
+  },
+  {
+   "id": "page-1:item-7",
+   "name": "Dining chair, lower right",
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "x": 8279.186,
+   "y": 6938.029,
+   "elevation": 0,
+   "rotation": 180,
+   "width": 407.246,
+   "depth": 464.802,
+   "height": 880,
+   "params": {},
+   "materials": {
+    "seat": {
+     "kind": "color",
+     "hex": "#cdbfa8",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    }
+   }
+  },
+  {
+   "id": "page-1:item-8",
+   "name": "Dining chair, left end",
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "x": 6964.965,
+   "y": 6286.823,
+   "elevation": 0,
+   "rotation": 270,
+   "width": 407.246,
+   "depth": 425.045,
+   "height": 880,
+   "params": {},
+   "materials": {
+    "seat": {
+     "kind": "color",
+     "hex": "#cdbfa8",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    }
+   }
+  },
+  {
+   "id": "page-1:item-9",
+   "name": "Left three-seat sofa",
+   "source": {
+    "kind": "parametric",
+    "type": "sofa"
+   },
+   "x": 2574.186,
+   "y": 8089.198,
+   "elevation": 0,
+   "rotation": 270,
+   "width": 2134.04,
+   "depth": 940.756,
+   "height": 820,
+   "params": {},
+   "materials": {
+    "fabric": {
+     "kind": "color",
+     "hex": "#a8a698",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-10",
+   "name": "Lower three-seat sofa",
+   "source": {
+    "kind": "parametric",
+    "type": "sofa"
+   },
+   "x": 6464.363,
+   "y": 9783.982,
+   "elevation": 0,
+   "rotation": 180,
+   "width": 2134.04,
+   "depth": 938.978,
+   "height": 820,
+   "params": {},
+   "materials": {
+    "fabric": {
+     "kind": "color",
+     "hex": "#a8a698",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-11",
+   "name": "Lower-left armchair",
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "x": 3613.641,
+   "y": 9783.982,
+   "elevation": 0,
+   "rotation": 180,
+   "width": 914.08,
+   "depth": 938.978,
+   "height": 820,
+   "params": {},
+   "materials": {
+    "seat": {
+     "kind": "color",
+     "hex": "#b9835a",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-12",
+   "name": "Right armchair",
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "x": 8162.704,
+   "y": 8799.656,
+   "elevation": 0,
+   "rotation": 90,
+   "width": 915.859,
+   "depth": 938.977,
+   "height": 820,
+   "params": {},
+   "materials": {
+    "seat": {
+     "kind": "color",
+     "hex": "#b9835a",
+     "roughness": 0.95,
+     "pattern": "fabric"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-13",
+   "name": "Long rectangular coffee table",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 4893.176,
+   "y": 8260.81,
+   "elevation": 0,
+   "rotation": 270,
+   "width": 1371.121,
+   "depth": 457.04,
+   "height": 420,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#8a5a3a",
+     "roughness": 0.4,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-14",
+   "name": "Left organic nesting table, larger",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 3774.818,
+   "y": 8196.009,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 577.426,
+   "depth": 568.808,
+   "height": 450,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#c9a075",
+     "roughness": 0.45,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-15",
+   "name": "Left organic nesting table, smaller",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 3792.055,
+   "y": 8575.214,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 422.297,
+   "depth": 405.06,
+   "height": 380,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#c9a075",
+     "roughness": 0.45,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-16",
+   "name": "Right organic nesting table, larger",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 6403.401,
+   "y": 8652.779,
+   "elevation": 0,
+   "rotation": 270,
+   "width": 560.19,
+   "depth": 568.808,
+   "height": 450,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#c9a075",
+     "roughness": 0.45,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-17",
+   "name": "Right organic nesting table, smaller",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 6791.225,
+   "y": 8661.397,
+   "elevation": 0,
+   "rotation": 270,
+   "width": 413.679,
+   "depth": 405.06,
+   "height": 380,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#c9a075",
+     "roughness": 0.45,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-18",
+   "name": "Round side table, lower left",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 2594.11,
+   "y": 9824.869,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 542.953,
+   "depth": 542.953,
+   "height": 500,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#c9a075",
+     "roughness": 0.45,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  },
+  {
+   "id": "page-1:item-19",
+   "name": "Round side table, lower right",
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "x": 8066.734,
+   "y": 9824.869,
+   "elevation": 0,
+   "rotation": 0,
+   "width": 542.953,
+   "depth": 542.953,
+   "height": 500,
+   "params": {},
+   "materials": {
+    "top": {
+     "kind": "color",
+     "hex": "#c9a075",
+     "roughness": 0.45,
+     "pattern": "wood"
+    },
+    "legs": {
+     "kind": "color",
+     "hex": "#2a2522",
+     "roughness": 0.35,
+     "metalness": 0.2
+    }
+   }
+  }
+ ],
+ "lighting": {
+  "preset": "noon",
+  "sunAzimuth": 135,
+  "exposure": 1,
+  "ceilingLights": true,
+  "lightTemp": 3500
+ },
+ "cameras": [],
+ "underlay": null,
+ "ceilings": [],
+ "panels": [],
+ "fixtures": []
+}

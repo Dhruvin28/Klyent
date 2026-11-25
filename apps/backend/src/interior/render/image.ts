@@ -16,7 +16,9 @@ export function decodePng(buf: Buffer): PNG {
   return PNG.sync.read(buf)
 }
 export function encodePng(png: PNG): Buffer {
-  return PNG.sync.write(png, { colorType: 2, inputHasAlpha: false, deflateLevel: 6 })
+  // The in-memory buffer is always RGBA (4 bytes/pixel). Declare that as the input format and
+  // write opaque RGB; saying "no alpha" makes pngjs read it as 3-byte pixels (striped, 3x-wide image).
+  return PNG.sync.write(png, { colorType: 2, inputColorType: 6, inputHasAlpha: true, deflateLevel: 6 })
 }
 
 export function mirrorX(png: PNG) {
@@ -72,6 +74,98 @@ export function autoExpose(png: PNG, target: number): { gain: number } {
     png.data[i + 2] = lut[png.data[i + 2]]
   }
   return { gain }
+}
+
+// ── structural fidelity metric ──
+
+/** Area-average a grayscale field to (tw, th). */
+function resizeGray(src: Float32Array, w: number, h: number, tw: number, th: number): Float32Array {
+  const out = new Float32Array(tw * th)
+  for (let y = 0; y < th; y++) {
+    const y0 = Math.floor((y * h) / th), y1 = Math.max(y0 + 1, Math.floor(((y + 1) * h) / th))
+    for (let x = 0; x < tw; x++) {
+      const x0 = Math.floor((x * w) / tw), x1 = Math.max(x0 + 1, Math.floor(((x + 1) * w) / tw))
+      let s = 0, n = 0
+      for (let yy = y0; yy < y1 && yy < h; yy++) for (let xx = x0; xx < x1 && xx < w; xx++) { s += src[yy * w + xx]; n++ }
+      out[y * tw + x] = n ? s / n : 0
+    }
+  }
+  return out
+}
+
+function blur3(a: Float32Array, w: number, h: number, passes = 1): Float32Array {
+  let cur = a
+  for (let p = 0; p < passes; p++) {
+    const out = new Float32Array(cur.length)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let s = 0, n = 0
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue
+          s += cur[yy * w + xx]
+          n++
+        }
+        out[y * w + x] = s / n
+      }
+    }
+    cur = out
+  }
+  return cur
+}
+
+/** Sobel gradient magnitude of the luminance of an image resampled to (tw, th). */
+function gradientField(png: PNG, tw: number, th: number): Float32Array {
+  const luma = new Float32Array(png.width * png.height)
+  for (let i = 0; i < luma.length; i++) luma[i] = (0.2126 * png.data[i * 4] + 0.7152 * png.data[i * 4 + 1] + 0.0722 * png.data[i * 4 + 2]) / 255
+  const l = resizeGray(luma, png.width, png.height, tw, th)
+  const g = new Float32Array(tw * th)
+  for (let y = 1; y < th - 1; y++) {
+    for (let x = 1; x < tw - 1; x++) {
+      const i = y * tw + x
+      const gx = -l[i - tw - 1] - 2 * l[i - 1] - l[i + tw - 1] + l[i - tw + 1] + 2 * l[i + 1] + l[i + tw + 1]
+      const gy = -l[i - tw - 1] - 2 * l[i - tw] - l[i - tw + 1] + l[i + tw - 1] + 2 * l[i + tw] + l[i + tw + 1]
+      g[i] = Math.hypot(gx, gy)
+    }
+  }
+  return g
+}
+
+/**
+ * How well a candidate image keeps the model's structure: normalised cross-correlation (-1..1)
+ * between the guide's structural-edge map and the candidate's luminance-gradient map, both
+ * blurred so that surface texture drops out and only layout (walls, openings, furniture
+ * outlines) remains. A repositioned wall or piece of furniture lowers it; texture does not.
+ * Pass `shift` (fraction of width) to measure the unaligned baseline.
+ */
+export function structureScore(guideEdges: Uint8Array, gw: number, gh: number, candidate: PNG, shift = 0): number {
+  const tw = 320
+  const th = Math.max(8, Math.round((tw * gh) / gw))
+  const e = new Float32Array(gw * gh)
+  for (let i = 0; i < e.length; i++) e[i] = guideEdges[i]
+  const A = blur3(resizeGray(e, gw, gh, tw, th), tw, th, 2)
+  const B = blur3(gradientField(candidate, tw, th), tw, th, 2)
+  const sh = Math.round(shift * tw)
+  let sa = 0, sb = 0, n = 0
+  for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
+    const xb = x + sh
+    if (xb < 0 || xb >= tw) continue
+    sa += A[y * tw + x]
+    sb += B[y * tw + xb]
+    n++
+  }
+  if (!n) return 0
+  const ma = sa / n, mb = sb / n
+  let cov = 0, va = 0, vb = 0
+  for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
+    const xb = x + sh
+    if (xb < 0 || xb >= tw) continue
+    const da = A[y * tw + x] - ma, db = B[y * tw + xb] - mb
+    cov += da * db
+    va += da * da
+    vb += db * db
+  }
+  return va > 1e-12 && vb > 1e-12 ? cov / Math.sqrt(va * vb) : 0
 }
 
 /** Box-filter downscale so the long side is at most `maxSide`. */

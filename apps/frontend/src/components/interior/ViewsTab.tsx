@@ -160,11 +160,11 @@ export function ViewsTab({ summary, revision }: { summary: WorkspaceSummary; rev
             </Button>
             {unavailable && (
               <p className="flex items-start gap-1.5 rounded-md bg-destructive/10 p-2 text-[11px] text-destructive">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> The render worker has no Blender (BLENDER_PATH is not set), so rendering is unavailable.
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> The render worker is not set up (Cycles mode needs Blender / BLENDER_PATH), so rendering is unavailable.
               </p>
             )}
             <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-              <CloudCog className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Rendered on the server in the background (Blender Cycles); nothing runs on this device.
+              <CloudCog className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Rendered on the server in the background (dimension-exact model render, then an AI photoreal pass that is checked against the model); nothing runs on this device.
             </p>
             <p className="text-[11px] text-muted-foreground">Perspective images are not measurable; dimensions come from the elevations and the validation report.</p>
           </div>

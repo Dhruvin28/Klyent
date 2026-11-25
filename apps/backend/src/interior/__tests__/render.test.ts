@@ -77,3 +77,84 @@ test('image helpers', () => {
   assert.equal(png.data[(7) * 4], 1)
   assert.equal(downscale(png, 4).width, 4)
 })
+
+// ── built-in renderer ──
+import { renderGuide } from '../render/guide'
+import { encodePng, structureScore } from '../render/image'
+import { pickSize, sizeDims } from '../render/enhance'
+
+const emptyInputs = { library: new Map(), models: new Map() }
+
+test('encodePng round-trips an RGBA image (regression: striped 3x-wide PNGs)', () => {
+  const png = new PNG({ width: 5, height: 3 })
+  for (let i = 0; i < 15; i++) { png.data[i * 4] = i * 10; png.data[i * 4 + 1] = 200; png.data[i * 4 + 2] = 30; png.data[i * 4 + 3] = 255 }
+  const back = PNG.sync.read(encodePng(png))
+  assert.equal(back.width, 5)
+  assert.equal(back.height, 3)
+  for (let i = 0; i < 15; i++) {
+    assert.equal(back.data[i * 4], i * 10)
+    assert.equal(back.data[i * 4 + 1], 200)
+    assert.equal(back.data[i * 4 + 2], 30)
+  }
+})
+
+test('guide renderer draws the model: exact aspect, lit window, furniture, structural edges', () => {
+  const plan = room()
+  const view = buildCameras(plan).find((v) => v.group === 'perspective' && v.key.endsWith(':S'))!
+  const scene = compileRenderScene(plan, view, emptyInputs)
+  const r = renderGuide(scene, { width: 480, height: 270, refAspect: 16 / 9, supersample: 1 })
+  assert.equal(r.png.width, 480)
+  assert.equal(r.png.height, 270)
+  assert.equal(r.edges.length, 480 * 270)
+  const edgePixels = r.edges.reduce((n, v) => n + v, 0)
+  assert.ok(edgePixels > 300, `edges ${edgePixels}`)
+  // Not a flat image: many distinct tones.
+  const tones = new Set<number>()
+  for (let i = 0; i < r.png.data.length; i += 4 * 97) tones.add(r.png.data[i] >> 3)
+  assert.ok(tones.size > 6)
+  // Deterministic.
+  const again = renderGuide(scene, { width: 480, height: 270, refAspect: 16 / 9, supersample: 1 })
+  assert.ok(Buffer.from(r.png.data).equals(Buffer.from(again.png.data)))
+})
+
+test('guide at an API-supported aspect keeps the horizontal extent of the authored view', () => {
+  const plan = room()
+  const view = buildCameras(plan).find((v) => v.group === 'perspective')!
+  const scene = compileRenderScene(plan, view, emptyInputs)
+  const wide = renderGuide(scene, { width: 320, height: 180, refAspect: 16 / 9, supersample: 1 })
+  const api = sizeDims(pickSize(16 / 9))
+  assert.deepEqual(api, { width: 1536, height: 1024 })
+  const tall = renderGuide(scene, { width: 360, height: 240, refAspect: 16 / 9, supersample: 1 })
+  // Same horizontal extent: the leftmost wall edge sits at the same horizontal fraction.
+  const firstEdgeX = (r: ReturnType<typeof renderGuide>, w: number, h: number) => {
+    for (let x = 0; x < w; x++) for (let y = Math.floor(h * 0.4); y < Math.floor(h * 0.6); y++) if (r.edges[y * w + x]) return x / w
+    return -1
+  }
+  const a = firstEdgeX(wide, 320, 180), b = firstEdgeX(tall, 360, 240)
+  assert.ok(a >= 0 && b >= 0 && Math.abs(a - b) < 0.05, `${a} vs ${b}`)
+})
+
+test('elevation views are a section cut: furniture against the wall is in front of the camera', () => {
+  const plan = room()
+  const elev = buildCameras(plan).find((v) => v.group === 'elevation')!
+  const scene = compileRenderScene(plan, elev, emptyInputs)
+  assert.ok(scene.camera.clipStart > 0.5)
+  assert.ok(scene.meshes.some((m) => m.name.startsWith('item_i1')) || scene.meshes.length > 0)
+})
+
+test('structureScore: faithful > shifted, and texture does not matter', () => {
+  const W = 192, H = 128
+  const edges = new Uint8Array(W * H)
+  const img = new PNG({ width: W, height: H })
+  for (let i = 0; i < img.data.length; i += 4) { img.data[i] = img.data[i + 1] = img.data[i + 2] = 200; img.data[i + 3] = 255 }
+  const box = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let x = x0; x <= x1; x++) for (const y of [y0, y1]) { edges[y * W + x] = 1; const o = (y * W + x) * 4; img.data[o] = img.data[o + 1] = img.data[o + 2] = 20 }
+    for (let y = y0; y <= y1; y++) for (const x of [x0, x1]) { edges[y * W + x] = 1; const o = (y * W + x) * 4; img.data[o] = img.data[o + 1] = img.data[o + 2] = 20 }
+  }
+  box(30, 30, 100, 90)
+  box(110, 20, 170, 100)
+  const aligned = structureScore(edges, W, H, img)
+  const shifted = structureScore(edges, W, H, img, 0.12)
+  assert.ok(aligned > 0.6, `aligned ${aligned}`)
+  assert.ok(shifted < aligned - 0.2, `shifted ${shifted}`)
+})

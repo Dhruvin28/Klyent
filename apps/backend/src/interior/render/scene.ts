@@ -25,6 +25,8 @@ import type { ViewSpec } from '../build/views'
 // Z = up, all in metres.
 
 const MM = 0.001
+/** How far in front of the wall an elevation shows (section cut), metres. */
+const ELEVATION_DEPTH_M = 1.3
 type V3 = [number, number, number]
 
 export interface SceneMaterial {
@@ -86,6 +88,8 @@ export interface SceneExport {
     fov: number
     orthoWidth: number
     orthoHeight: number
+    /** Near clip distance in metres (elevations use it as a section cut through the room). */
+    clipStart: number
   }
   world: {
     preset: string
@@ -811,6 +815,7 @@ export function compileRenderScene(plan: Plan, view: ViewSpec, inputs: SceneInpu
       fov: view.fov,
       orthoWidth: (view.ortho?.width ?? 0) * MM,
       orthoHeight: (view.ortho?.height ?? 0) * MM,
+      clipStart: view.group === 'elevation' ? Math.max(0.03, Math.hypot(view.position[0] - view.target[0], view.position[1] - view.target[1]) * MM - ELEVATION_DEPTH_M) : 0.03,
     },
     world: {
       preset: plan.lighting.preset,

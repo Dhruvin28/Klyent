@@ -28,7 +28,7 @@ import { buildCameras, type ViewSpec } from '../../interior/build/views'
 import { calibratePage } from '../../interior/geometry/calibrate'
 import { sniffDocument } from '../../interior/extract'
 import { enqueueJob } from '../../interior/jobs'
-import { blenderConfigured } from '../../interior/render/blender'
+import { renderEngineReady } from '../../interior/render/blender'
 import { enqueueRenderSet, RENDER_QUALITY } from '../../interior/render/service'
 import {
   ServiceError,
@@ -530,7 +530,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
       ? await db.select().from(intApprovals).where(and(eq(intApprovals.revisionId, rev.id), eq(intApprovals.sceneHash, rev.sceneHash))).orderBy(desc(intApprovals.approvedAt)).limit(1)
       : []
     if (!approval && !body.allowDraft) throw httpError(409, 'Approve this revision before producing final renders, or render it as a labelled draft.', 'APPROVAL_REQUIRED')
-    if (!blenderConfigured()) throw httpError(503, 'Server-side rendering is not set up: the render worker has no Blender (set BLENDER_PATH).', 'RENDER_UNAVAILABLE')
+    if (!renderEngineReady()) throw httpError(503, 'Server-side rendering is not set up: INTERIOR_RENDER_ENGINE=cycles needs Blender (set BLENDER_PATH).', 'RENDER_UNAVAILABLE')
     const all = buildCameras(scene.plan)
     const views: ViewSpec[] = body.viewKeys.map((k) => {
       const v = all.find((x) => x.key === k)
@@ -579,7 +579,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const [set] = await db.select().from(intRenderSets).where(and(eq(intRenderSets.id, id), eq(intRenderSets.userId, uid(request)))).limit(1)
     if (!set) throw httpError(404, 'Render set not found', 'NOT_FOUND')
-    if (!blenderConfigured()) throw httpError(503, 'Server-side rendering is not set up: the render worker has no Blender (set BLENDER_PATH).', 'RENDER_UNAVAILABLE')
+    if (!renderEngineReady()) throw httpError(503, 'Server-side rendering is not set up: INTERIOR_RENDER_ENGINE=cycles needs Blender (set BLENDER_PATH).', 'RENDER_UNAVAILABLE')
     const outputs = set.outputs as Record<string, { status: string }>
     const keys = Object.entries(outputs).filter(([, o]) => o.status === 'failed' || o.status === 'pending').map(([k]) => k)
     const next = Object.fromEntries(Object.entries(outputs).map(([k, o]) => [k, keys.includes(k) ? { status: 'pending', assetId: null, error: null } : o]))
@@ -589,7 +589,7 @@ export default async function interiorRoutes(app: FastifyInstance) {
     return { data: row }
   })
 
-  app.get('/render-capabilities', async () => ({ data: { serverRendering: blenderConfigured(), photoreal: config.interior.render.enhance && !!config.openai.apiKey, imageModel: config.interior.render.imageModel } }))
+  app.get('/render-capabilities', async () => ({ data: { serverRendering: renderEngineReady(), engine: config.interior.render.engine, photoreal: config.interior.render.enhance && !!config.openai.apiKey, imageModel: config.interior.render.imageModel } }))
 
   // Designer project linkage info (used by the UI to open the designer).
   app.get('/workspaces/:id/designer', async (request) => {

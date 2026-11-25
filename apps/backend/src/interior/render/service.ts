@@ -10,8 +10,10 @@ import type { ViewSpec } from '../build/views'
 import type { SceneDoc } from '../contracts'
 import { enqueueJob, JobError, registerJobHandler, type JobContext } from '../jobs'
 import { RenderError, runBlender } from './blender'
-import { enhanceRender } from './enhance'
-import { autoExpose, decodePng, downscale, encodePng, mirrorX } from './image'
+import { enhanceRender, pickSize, sizeDims } from './enhance'
+import { renderGuide, type GuideModelGeometry } from './guide'
+import { autoExpose, decodePng, encodePng, mirrorX } from './image'
+import { loadModelGeometry } from './models'
 import { compileRenderScene, type LibraryTexture, type ModelFile } from './scene'
 
 export type RenderOutput = {
@@ -23,6 +25,9 @@ export type RenderOutput = {
   /** AI photoreal pass (null when disabled, failed or rejected). */
   enhancedAssetId?: string | null
   enhancement?: 'verified' | 'unverified' | 'rejected' | 'failed' | 'off'
+  /** Audit score (0-100) and structural correlation of the photoreal pass. */
+  fidelity?: { score: number | null; structure: number | null; candidates: number } | null
+  engine?: 'guide' | 'cycles'
   note?: string | null
   error: string | null
 }
@@ -97,8 +102,9 @@ function collectRefs(plan: Plan): MatRef[] {
 
 const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
 
-async function loadInputs(userId: string, plan: Plan, dir: string) {
+export async function loadInputs(userId: string, plan: Plan, dir: string) {
   const library = new Map<string, LibraryTexture>()
+  const materialNames = new Map<string, string>()
   const ids = [...new Set(collectRefs(plan).flatMap((r) => (r.kind === 'library' ? [r.materialId] : [])))]
   if (ids.length) {
     const rows = await db.select().from(vizMaterials).where(and(inArray(vizMaterials.id, ids), eq(vizMaterials.userId, userId)))
@@ -115,6 +121,7 @@ async function loadInputs(userId: string, plan: Plan, dir: string) {
       const w = m.widthMm ? Number(m.widthMm) : 600
       const h = m.heightMm ? Number(m.heightMm) : m.widthMm && m.textureWidth && m.textureHeight ? (Number(m.widthMm) * m.textureHeight) / m.textureWidth : 600
       library.set(m.id, { colorHex: m.colorHex, file, widthMm: w || 600, heightMm: h || 600 })
+      materialNames.set(m.id, [m.name, m.category, m.brand].filter(Boolean).join(', ') + (m.colorHex ? ` (${m.colorHex})` : ''))
     }
   }
   const models = new Map<string, ModelFile>()
@@ -129,7 +136,7 @@ async function loadInputs(userId: string, plan: Plan, dir: string) {
       models.set(m.id, { file, widthMm: Number(m.widthMm), depthMm: Number(m.depthMm), heightMm: Number(m.heightMm) })
     }
   }
-  return { library, models }
+  return { library, models, materialNames }
 }
 
 async function storeImage(set: RenderSetRow, manifest: Manifest, view: ViewSpec, png: Buffer, width: number, height: number, variant: 'raw' | 'photoreal') {
@@ -151,7 +158,7 @@ async function storeImage(set: RenderSetRow, manifest: Manifest, view: ViewSpec,
       camera: view.name,
       samples: manifest.quality.samples,
       preset: manifest.quality.preset,
-      interior: { renderSetId: set.id, revisionNo: manifest.revisionNo, sceneHash: manifest.sceneHash, viewKey: view.key, group: view.group, label: manifest.label, projection: view.projection, variant, renderer: variant === 'raw' ? 'blender-cycles' : config.interior.render.imageModel },
+      interior: { renderSetId: set.id, revisionNo: manifest.revisionNo, sceneHash: manifest.sceneHash, viewKey: view.key, group: view.group, label: manifest.label, projection: view.projection, variant, renderer: variant === 'raw' ? (config.interior.render.engine === 'cycles' ? 'blender-cycles' : 'klyent-raster') : config.interior.render.imageModel },
     },
     data: png,
   })
@@ -186,26 +193,53 @@ async function handleRenderView(ctx: JobContext) {
     if (!scene.meshes.length) throw new JobError('EMPTY_SCENE', 'The model has no geometry to render.')
     const sceneJson = path.join(dir, 'scene.json')
     await writeFile(sceneJson, JSON.stringify(scene))
-    // The photoreal pass outputs ~1536px anyway, so the Cycles reference only needs to be a clean
-    // geometric guide. Cap its cost: this keeps CPU-only hosts inside the time limit.
-    const guide = manifest.enhance !== false && config.interior.render.enhance && (view.group === 'perspective' || view.group === 'isometric')
-    const longSide = guide ? Math.min(manifest.quality.longSide, 1280) : manifest.quality.longSide
-    const samples = guide ? Math.min(manifest.quality.samples, 96) : manifest.quality.samples
-    const { width, height } = dims(view, longSide)
-    const outPng = path.join(dir, 'render.png')
-
-    await ctx.checkpoint({ stage: 'render', triangles: scene.stats.triangles, lights: scene.stats.lights })
-    ctx.log.info({ view: viewKey, triangles: scene.stats.triangles, lights: scene.stats.lights, samples: manifest.quality.samples }, 'interior render: blender start')
-    try {
-      await runBlender({ sceneJson, outPng, width, height, samples })
-    } catch (err) {
-      if (err instanceof RenderError) throw new JobError(err.code, err.message, err.retryable)
-      throw err
+    const wantsEnhance = manifest.enhance !== false && config.interior.render.enhance && (view.group === 'perspective' || view.group === 'isometric')
+    const engine = config.interior.render.engine
+    const refAspect = view.aspect || 16 / 9
+    let png: ReturnType<typeof decodePng>
+    let width: number
+    let height: number
+    let guideForAi: { png: Buffer; width: number; height: number; edges: Uint8Array } | null = null
+    const modelGeo = new Map<string, GuideModelGeometry[]>()
+    for (const m of scene.models) {
+      if (modelGeo.has(m.file)) continue
+      const g = await loadModelGeometry(path.join(dir, m.file))
+      if (g) modelGeo.set(m.file, g)
     }
-    await ctx.checkpoint({ stage: 'post' })
+    // The AI image is requested at an API-supported size. The guide is rendered at exactly that
+    // size (same horizontal extent), so the model never re-crops and the audit compares like for like.
+    const makeAiGuide = () => {
+      const size = sizeDims(pickSize(dims(view, manifest.quality.longSide).width / dims(view, manifest.quality.longSide).height))
+      const g = renderGuide(scene, { width: size.width, height: size.height, refAspect, supersample: 2, models: modelGeo })
+      return { png: encodePng(g.png), width: size.width, height: size.height, edges: g.edges }
+    }
 
-    const png = decodePng(await readFile(outPng))
-    if (plan.lighting.preset !== 'night') autoExpose(png, view.group === 'perspective' ? 112 : 128)
+    if (engine === 'guide') {
+      // Built-in renderer: dimension-exact, noise-free, seconds per view, no Blender needed.
+      await ctx.checkpoint({ stage: 'render', triangles: scene.stats.triangles, lights: scene.stats.lights, engine })
+      ;({ width, height } = dims(view, manifest.quality.longSide))
+      const raw = renderGuide(scene, { width, height, refAspect, supersample: 2, models: modelGeo })
+      png = raw.png
+      ctx.log.info({ view: viewKey, triangles: raw.stats.triangles, ms: raw.stats.ms }, 'interior render: guide renderer done')
+    } else {
+      // Cycles: physically based but slow on CPU. When it is only the AI guide, cap its cost.
+      const longSide = wantsEnhance ? Math.min(manifest.quality.longSide, 1280) : manifest.quality.longSide
+      const samples = wantsEnhance ? Math.min(manifest.quality.samples, 96) : manifest.quality.samples
+      ;({ width, height } = dims(view, longSide))
+      const outPng = path.join(dir, 'render.png')
+      await ctx.checkpoint({ stage: 'render', triangles: scene.stats.triangles, lights: scene.stats.lights, engine })
+      ctx.log.info({ view: viewKey, triangles: scene.stats.triangles, lights: scene.stats.lights, samples }, 'interior render: blender start')
+      try {
+        await runBlender({ sceneJson, outPng, width, height, samples })
+      } catch (err) {
+        if (err instanceof RenderError) throw new JobError(err.code, err.message, err.retryable)
+        throw err
+      }
+      png = decodePng(await readFile(outPng))
+      if (plan.lighting.preset !== 'night') autoExpose(png, view.group === 'perspective' ? 112 : 128)
+    }
+    if (wantsEnhance) guideForAi = makeAiGuide()
+    await ctx.checkpoint({ stage: 'post' })
     if (view.mirrorX) mirrorX(png)
     const rawBuf = encodePng(png)
 
@@ -213,19 +247,20 @@ async function handleRenderView(ctx: JobContext) {
     let note: string | null = null
     let enhancedBuf: Buffer | null = null
     let enhancedDims = { width, height }
-    const wantsEnhance = manifest.enhance !== false && config.interior.render.enhance && (view.group === 'perspective' || view.group === 'isometric')
-    if (wantsEnhance) {
+    let fidelity: RenderOutput['fidelity'] = null
+    if (wantsEnhance && guideForAi) {
       await ctx.checkpoint({ stage: 'photoreal' })
-      const reference = encodePng(downscale(png, 1536))
-      const res = await enhanceRender(reference, plan, view, width / height, (m) => ctx.log.warn({ view: viewKey }, m))
+      const res = await enhanceRender(guideForAi, { plan, view, materialNames: inputs.materialNames }, (m) => ctx.log.warn({ view: viewKey }, m))
       if (!res) {
         enhancement = 'failed'
-        note = 'The photoreal pass was unavailable; this is the physically based render.'
+        note = 'The photoreal pass was unavailable; this is the dimension-exact model render.'
       } else if (res.verified === false) {
         enhancement = 'rejected'
-        note = `The photoreal pass changed the model (${res.issues.slice(0, 3).join('; ') || 'fidelity check failed'}), so the exact render is shown.`
+        fidelity = { score: res.score, structure: res.structure, candidates: res.candidates }
+        note = `The photoreal pass did not keep the model's geometry (${res.issues.slice(0, 3).join('; ') || 'fidelity check failed'}), so the exact render is shown.`
       } else {
         enhancement = res.verified ? 'verified' : 'unverified'
+        fidelity = { score: res.score, structure: res.structure, candidates: res.candidates }
         enhancedBuf = res.png
         const out = decodePng(res.png)
         enhancedDims = { width: out.width, height: out.height }
@@ -241,6 +276,8 @@ async function handleRenderView(ctx: JobContext) {
       rawAssetId,
       enhancedAssetId,
       enhancement,
+      fidelity,
+      engine,
       note,
       error: null,
     })

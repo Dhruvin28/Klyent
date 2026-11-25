@@ -1,0 +1,1240 @@
+{
+ "items": [
+  {
+   "x": 4890.682,
+   "y": 5209.26,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-1",
+   "name": "TV base unit",
+   "depth": 380.515,
+   "width": 2988.997,
+   "height": 1000,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "tv_unit"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "handle": {
+     "hex": "#8a8a8f",
+     "kind": "color",
+     "metalness": 0.9,
+     "roughness": 0.3
+    },
+    "carcass": {
+     "hex": "#5e3d28",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.45
+    },
+    "shutter": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    }
+   }
+  },
+  {
+   "x": 4782.46,
+   "y": 5108.797,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-2",
+   "name": "Television",
+   "depth": 101.352,
+   "width": 878.939,
+   "height": 1000,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "box"
+   },
+   "rotation": 0,
+   "elevation": 450,
+   "materials": {
+    "body": {
+     "hex": "#0d0d0f",
+     "kind": "color",
+     "metalness": 0.3,
+     "roughness": 0.15
+    }
+   }
+  },
+  {
+   "x": 7939.246,
+   "y": 6285.904,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-3",
+   "name": "Dining table",
+   "depth": 837.488,
+   "width": 1525.616,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  },
+  {
+   "x": 7577.402,
+   "y": 5639.332,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-4",
+   "name": "Dining chair",
+   "depth": 455.655,
+   "width": 407.186,
+   "height": 900,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    },
+    "seat": {
+     "hex": "#cdbfa8",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 8252.193,
+   "y": 5639.332,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-5",
+   "name": "Dining chair",
+   "depth": 455.655,
+   "width": 405.408,
+   "height": 900,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    },
+    "seat": {
+     "hex": "#cdbfa8",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 7602.295,
+   "y": 6932.706,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-6",
+   "name": "Dining chair",
+   "depth": 456.117,
+   "width": 407.186,
+   "height": 900,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "rotation": 180,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    },
+    "seat": {
+     "hex": "#cdbfa8",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 8277.976,
+   "y": 6932.706,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-7",
+   "name": "Dining chair",
+   "depth": 456.117,
+   "width": 407.186,
+   "height": 900,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "rotation": 180,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    },
+    "seat": {
+     "hex": "#cdbfa8",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 6957.484,
+   "y": 6285.904,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-8",
+   "name": "Dining chair",
+   "depth": 437.909,
+   "width": 407.186,
+   "height": 900,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "rotation": 270,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    },
+    "seat": {
+     "hex": "#cdbfa8",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 2573.81,
+   "y": 8088.015,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-9",
+   "name": "Three-seat sofa",
+   "depth": 940.619,
+   "width": 2133.728,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "sofa"
+   },
+   "rotation": 270,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    },
+    "fabric": {
+     "hex": "#a8a698",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 6463.418,
+   "y": 9782.551,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-10",
+   "name": "Three-seat sofa",
+   "depth": 938.841,
+   "width": 2133.728,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "sofa"
+   },
+   "rotation": 180,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    },
+    "fabric": {
+     "hex": "#a8a698",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 3613.113,
+   "y": 9782.551,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-11",
+   "name": "Armchair",
+   "depth": 938.841,
+   "width": 913.947,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "rotation": 180,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    },
+    "seat": {
+     "hex": "#b9835a",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 8161.51,
+   "y": 8798.369,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-12",
+   "name": "Armchair",
+   "depth": 938.84,
+   "width": 915.725,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "chair"
+   },
+   "rotation": 90,
+   "elevation": 0,
+   "materials": {
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    },
+    "seat": {
+     "hex": "#b9835a",
+     "kind": "color",
+     "pattern": "fabric",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "x": 4892.461,
+   "y": 8259.602,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-13",
+   "name": "Rectangular low table or ottoman",
+   "depth": 456.973,
+   "width": 1370.92,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 90,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#8a5a3a",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.4
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  },
+  {
+   "x": 3778.574,
+   "y": 8186.193,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-14",
+   "name": "Organic nesting table, larger",
+   "depth": 577.342,
+   "width": 551.491,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 90,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#c9a075",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.45
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  },
+  {
+   "x": 3787.192,
+   "y": 8565.343,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-15",
+   "name": "Organic nesting table, smaller",
+   "depth": 413.618,
+   "width": 405.001,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 90,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#c9a075",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.45
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  },
+  {
+   "x": 6406.773,
+   "y": 8651.514,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-16",
+   "name": "Organic nesting table, larger",
+   "depth": 568.725,
+   "width": 551.491,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#c9a075",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.45
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  },
+  {
+   "x": 6790.232,
+   "y": 8642.897,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-17",
+   "name": "Organic nesting table, smaller",
+   "depth": 400.693,
+   "width": 383.459,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#c9a075",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.45
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  },
+  {
+   "x": 2598.039,
+   "y": 9823.432,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-18",
+   "name": "Round side table",
+   "depth": 542.874,
+   "width": 542.874,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#c9a075",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.45
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  },
+  {
+   "x": 8069.863,
+   "y": 9823.432,
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:item-19",
+   "name": "Round side table",
+   "depth": 542.874,
+   "width": 551.491,
+   "height": 750,
+   "params": {},
+   "source": {
+    "kind": "parametric",
+    "type": "table"
+   },
+   "rotation": 0,
+   "elevation": 0,
+   "materials": {
+    "top": {
+     "hex": "#c9a075",
+     "kind": "color",
+     "pattern": "wood",
+     "roughness": 0.45
+    },
+    "legs": {
+     "hex": "#2a2522",
+     "kind": "color",
+     "metalness": 0.2,
+     "roughness": 0.35
+    }
+   }
+  }
+ ],
+ "rooms": [
+  {
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:room-1",
+   "name": "Living Room",
+   "floor": {
+    "hex": "#c79a68",
+    "kind": "color",
+    "pattern": "wood",
+    "roughness": 0.38
+   },
+   "points": [
+    {
+     "x": 1816.336,
+     "y": 4799.694
+    },
+    {
+     "x": 3154.361,
+     "y": 4799.694
+    },
+    {
+     "x": 3154.361,
+     "y": 4942.544
+    },
+    {
+     "x": 8754.918,
+     "y": 4942.544
+    },
+    {
+     "x": 8754.918,
+     "y": 5016.336
+    },
+    {
+     "x": 8751.841,
+     "y": 7341.21
+    },
+    {
+     "x": 8851.415,
+     "y": 7341.21
+    },
+    {
+     "x": 8851.415,
+     "y": 9530.452
+    },
+    {
+     "x": 8751.841,
+     "y": 9530.452
+    },
+    {
+     "x": 8751.841,
+     "y": 10543.58
+    },
+    {
+     "x": 5713.946,
+     "y": 10543.58
+    },
+    {
+     "x": 5713.946,
+     "y": 10572.919
+    },
+    {
+     "x": 1816.336,
+     "y": 10572.919
+    },
+    {
+     "x": 1816.336,
+     "y": 9823.432
+    },
+    {
+     "x": 1941.693,
+     "y": 9823.432
+    },
+    {
+     "x": 1941.693,
+     "y": 6049.166
+    },
+    {
+     "x": 1816.336,
+     "y": 6049.166
+    }
+   ],
+   "ceiling": {
+    "hex": "#fbfaf8",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.95
+   }
+  }
+ ],
+ "walls": [
+  {
+   "a": {
+    "x": 1816.336,
+    "y": 4799.694
+   },
+   "b": {
+    "x": 1816.336,
+    "y": 6049.166
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w2",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 350.287
+  },
+  {
+   "a": {
+    "x": 1816.336,
+    "y": 4799.694
+   },
+   "b": {
+    "x": 3154.361,
+    "y": 4799.694
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w3",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 129.256
+  },
+  {
+   "a": {
+    "x": 3154.361,
+    "y": 4799.694
+   },
+   "b": {
+    "x": 3154.361,
+    "y": 4942.544
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w4",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 124.468
+  },
+  {
+   "a": {
+    "x": 3154.361,
+    "y": 4942.544
+   },
+   "b": {
+    "x": 8754.918,
+    "y": 4942.544
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w5",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 152.917
+  },
+  {
+   "a": {
+    "x": 8754.918,
+    "y": 4942.544
+   },
+   "b": {
+    "x": 8754.918,
+    "y": 5016.336
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w6",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 103.405
+  },
+  {
+   "a": {
+    "x": 8754.918,
+    "y": 5016.336
+   },
+   "b": {
+    "x": 9832.049,
+    "y": 5016.336
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w7",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 300.5
+  },
+  {
+   "a": {
+    "x": 8754.918,
+    "y": 5016.336
+   },
+   "b": {
+    "x": 8751.841,
+    "y": 7341.21
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w8",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 99.574
+  },
+  {
+   "a": {
+    "x": 8751.841,
+    "y": 7341.21
+   },
+   "b": {
+    "x": 8851.415,
+    "y": 7341.21
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w9",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 99.574
+  },
+  {
+   "a": {
+    "x": 8851.415,
+    "y": 7341.21
+   },
+   "b": {
+    "x": 8851.415,
+    "y": 9530.452
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w10",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 298.722
+  },
+  {
+   "a": {
+    "x": 8851.415,
+    "y": 9530.452
+   },
+   "b": {
+    "x": 8751.841,
+    "y": 9530.452
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w11",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 103.405
+  },
+  {
+   "a": {
+    "x": 8751.841,
+    "y": 9530.452
+   },
+   "b": {
+    "x": 8751.841,
+    "y": 10543.58
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w12",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 99.574
+  },
+  {
+   "a": {
+    "x": 8751.841,
+    "y": 10543.58
+   },
+   "b": {
+    "x": 5713.946,
+    "y": 10543.58
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w13",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 124.467
+  },
+  {
+   "a": {
+    "x": 5713.946,
+    "y": 10572.919
+   },
+   "b": {
+    "x": 1816.336,
+    "y": 10572.919
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w14",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 65.79
+  },
+  {
+   "a": {
+    "x": 5713.946,
+    "y": 10543.58
+   },
+   "b": {
+    "x": 5713.946,
+    "y": 11155.249
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w15",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 126.246
+  },
+  {
+   "a": {
+    "x": 5713.946,
+    "y": 11155.249
+   },
+   "b": {
+    "x": 6075.017,
+    "y": 11155.249
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w16",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 99.574
+  },
+  {
+   "a": {
+    "x": 1816.336,
+    "y": 6049.166
+   },
+   "b": {
+    "x": 1941.693,
+    "y": 6049.166
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w17",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 103.405
+  },
+  {
+   "a": {
+    "x": 1941.693,
+    "y": 6049.166
+   },
+   "b": {
+    "x": 1941.693,
+    "y": 9823.432
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w18",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 99.574
+  },
+  {
+   "a": {
+    "x": 1941.693,
+    "y": 9823.432
+   },
+   "b": {
+    "x": 1816.336,
+    "y": 9823.432
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w19",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 103.405
+  },
+  {
+   "a": {
+    "x": 1816.336,
+    "y": 9823.432
+   },
+   "b": {
+    "x": 1816.336,
+    "y": 10572.919
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w20",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 350.287
+  },
+  {
+   "a": {
+    "x": 1816.336,
+    "y": 10572.919
+   },
+   "b": {
+    "x": 1816.336,
+    "y": 11167.691
+   },
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:w21",
+   "left": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "right": {
+    "hex": "#f1ede6",
+    "kind": "color",
+    "pattern": "plaster",
+    "roughness": 0.92
+   },
+   "height": null,
+   "thickness": 350.287
+  }
+ ],
+ "panels": [],
+ "cameras": [],
+ "version": 1,
+ "ceilings": [],
+ "fixtures": [],
+ "lighting": {
+  "preset": "noon",
+  "exposure": 1,
+  "lightTemp": 3500,
+  "sunAzimuth": 135,
+  "ceilingLights": true
+ },
+ "openings": [
+  {
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:opening-1",
+   "flip": false,
+   "sill": 0,
+   "type": "door",
+   "width": 1100.648,
+   "height": 2100,
+   "offset": 725.468,
+   "wallId": "91d7c571-4024-4594-9e7c-0655c84dd803:w3"
+  },
+  {
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:opening-2",
+   "flip": false,
+   "sill": 0,
+   "type": "opening",
+   "width": 2316.873,
+   "height": 2100,
+   "offset": 4389.257,
+   "wallId": "91d7c571-4024-4594-9e7c-0655c84dd803:w5"
+  },
+  {
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:opening-3",
+   "flip": false,
+   "sill": 0,
+   "type": "opening",
+   "width": 949.51,
+   "height": 2100,
+   "offset": 524.542,
+   "wallId": "91d7c571-4024-4594-9e7c-0655c84dd803:w10"
+  },
+  {
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:opening-4",
+   "flip": false,
+   "sill": 900,
+   "type": "window",
+   "width": 2325.763,
+   "height": 1200,
+   "offset": 1513.169,
+   "wallId": "91d7c571-4024-4594-9e7c-0655c84dd803:w13"
+  },
+  {
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:opening-5",
+   "flip": false,
+   "sill": 0,
+   "type": "door",
+   "width": 3051.231,
+   "height": 2100,
+   "offset": 1892.795,
+   "wallId": "91d7c571-4024-4594-9e7c-0655c84dd803:w14"
+  },
+  {
+   "id": "91d7c571-4024-4594-9e7c-0655c84dd803:opening-6",
+   "flip": false,
+   "sill": 0,
+   "type": "opening",
+   "width": 940.619,
+   "height": 2100,
+   "offset": 476.782,
+   "wallId": "91d7c571-4024-4594-9e7c-0655c84dd803:w18"
+  }
+ ],
+ "underlay": null,
+ "wallHeight": 2700
+}

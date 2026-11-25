@@ -452,7 +452,7 @@ for i, l in enumerate(spec["lights"]):
 # ── camera ──
 cam = spec["camera"]
 cd = bpy.data.cameras.new("Cam")
-cd.clip_start = 0.03
+cd.clip_start = float(cam.get("clipStart", 0.03))
 cd.clip_end = 300.0
 if cam["projection"] == "orthographic":
     cd.type = "ORTHO"

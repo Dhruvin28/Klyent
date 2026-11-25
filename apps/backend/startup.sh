@@ -61,6 +61,9 @@ install_blender() {
 }
 
 # Libraries first (every boot), then Blender itself (only if missing).
-( install_libs; install_blender ) >> /home/LogFiles/blender-install.log 2>&1 &
+# Only needed for INTERIOR_RENDER_ENGINE=cycles; the default built-in renderer needs no Blender.
+if [ "${INTERIOR_RENDER_ENGINE:-guide}" = "cycles" ]; then
+  ( install_libs; install_blender ) >> /home/LogFiles/blender-install.log 2>&1 &
+fi
 
 exec node apps/backend/dist/index.js

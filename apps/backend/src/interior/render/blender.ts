@@ -15,6 +15,11 @@ export class RenderError extends Error {
 
 const SCRIPT = [path.join(__dirname, 'blender', 'render_scene.py'), path.resolve(__dirname, '../../../src/interior/render/blender/render_scene.py')].find((p) => existsSync(p)) ?? path.join(__dirname, 'blender', 'render_scene.py')
 
+/** Server rendering is available: the built-in renderer always is; Cycles needs a working Blender. */
+export function renderEngineReady() {
+  return config.interior.render.engine === 'guide' || blenderConfigured()
+}
+
 /** The executable exists and its bundled Python (<dir>/<version>/python) came with it. */
 export function blenderConfigured() {
   const exe = config.interior.render.blenderPath
