@@ -30,6 +30,9 @@ Klyent is a client management SaaS platform for freelancers and small businesses
 - **Activity log** — Per-client log of payments, uploads, status changes, and comments
 - **File comments** — Threaded comments on individual files
 - **Dark mode** — Full light/dark theme support
+- **Material Visualizer** — Apply laminate, tile or paint samples to surfaces in a room render with perspective, preserved lighting and server-verified pixel integrity (see below)
+- **3D Designer** — Coohom-style room designer: draw or trace a floor plan (walls, doors, windows, auto-detected rooms), furnish it with parametric wardrobes/kitchens/beds, uploaded GLB models or free CC0 Poly Haven models, apply library finishes, then render path-traced stills (up to 4K), 360° panoramas and walkthrough videos in the browser, share a no-login virtual tour link and turn the BOM into a cost-breakup proposal
+- **Procurement** — Vendor price lists, side-by-side quote comparison per requirement, GST purchase orders with vendor share links, delivery and payment tracking, and project margins (see below)
 
 ## Project Structure
 
@@ -299,6 +302,68 @@ All routes except `/auth/register`, `/auth/login`, and `/files/share/:token` req
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/activity` | Yes | Activity log (filter by `clientId`) |
+
+### Material Visualizer
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET / POST | `/visualizer/projects` | Yes | List / create (multipart: `original`, lossless `reference` PNG, `thumbnail`, `name`, `clientId?`) |
+| GET / PATCH / DELETE | `/visualizer/projects/:id` | Yes | Read / save state (requires current `revision`, 409 on conflict) / delete with all assets |
+| POST | `/visualizer/projects/:id/masks` | Yes | Upload a surface or protect mask (grayscale PNG, project dimensions) |
+| GET | `/visualizer/assets/:id` | Yes | Owner-only binary asset (`?download=1` for attachment) |
+| GET / POST | `/visualizer/materials` | Yes | Material library (multipart: `data` JSON, `texture` PNG, `source` photo) |
+| PATCH / DELETE | `/visualizer/materials/:id` | Yes | Update / delete (409 while used by a project option) |
+| GET / POST | `/visualizer/projects/:id/exports` | Yes | List / create a verified export (multipart: `data`, `image` PNG, `mask` PNG) — rejected with 422 if any pixel outside the mask differs from the reference |
+| DELETE | `/visualizer/exports/:id` | Yes | Delete an export |
+
+## Material Visualizer
+
+Designers upload a room render, select surfaces (wardrobe shutters, walls, floors, panels), and apply laminate/tile samples or paint colours while everything else stays pixel-identical.
+
+- **Selection** — AI select (Segment Anything in the browser via transformers.js: *Fast* SlimSAM ~14MB or *Accurate* SAM ViT-B ~106MB, fetched from huggingface.co on first use and cached). Each click offers SAM's three candidates (part ↔ whole, Tab to cycle) and **HD edges** re-analyses just that area at full resolution. **Detect** proposes walls, floor, ceiling, wardrobes, cabinets, doors and countertops (SegFormer-B2 / ADE20K, ~29MB). Smart select, Polygon and Brush correct; a global **protect** mask keeps handles, seams and decor. All edits are undoable.
+- **Edges** — suggestions and (optionally) every render snap the soft outline to the render's edges with a local two-colour model, never moving it more than 3px (within the server's verification allowance).
+- **Perspective & area** — each surface has a quad (homography) and real width; **Auto-fit** fits the corners to the selection. Area is integrated on the real plane (|det J| per pixel), protected details excluded.
+- **Materials** — a reusable library. Sample photos are straightened from 4 corners, white-balanced from a neutral patch, de-lit and made tileable (seam-cut, so grain is not ghosted); **Expand ×2** synthesises a larger repeat by image quilting. Paint colours can be bulk-imported from CSV (`name, brand, code, hex, rate_per_litre, …`).
+- **Application** — grain rotation, scale, offset, tile layout/grout, finish per option; sheet materials can run as one sheet, **per panel** (each shutter from a different part of the sheet) or **book-matched**. Paint can *replace* the finish or *recolour* (keeps fabric weave / brushed metal). Glossy floors can show an approximate reflection.
+- **Lighting** — estimated from the render with an edge-preserving filter in log-luminance; the local light colour (warm lamps, daylight) can tint the new material, and **Scene light** calibration from a white wall sets exposure and white balance. Approximate: one image cannot reproduce true reflections, and on-screen colour depends on the sample photo and display.
+- **Options** — alternatives share surfaces/selections; **Variants** creates one option per material for a surface; compare in a grid or with a before/after swipe; mark one approved.
+- **Quantities & cost** — sheets (with wastage), tile boxes, paint litres (coats × coverage), wallpaper rolls or sq ft per material, with editable rates saved to the library; CSV download and **Send to proposal** pre-fills a cost-breakup proposal for the project's client.
+- **Sharing** — JPEG copies (WhatsApp size, optional logo watermark), a presentation PDF of all options with quantities, and **client review links** (`/visualizer/review/:token`, no login): the client swipes between options, comments and approves; the designer sees the decision in the Share dialog. Public endpoints live under `/api/visualizer-public` and only serve images published on that link.
+- **Replace render** — swap in a re-render of the same view (same aspect ratio, any resolution); selections, corners and options are rescaled and kept.
+- **Integrity** — compositing never writes a pixel whose edit alpha is 0. Every render is verified in the browser, and every export is decoded and re-verified on the server (`viz_exports.verification`); exports that fail are rejected. Exports are lossless PNG with the edit mask, a material-schedule PDF (with quantities) and JSON details.
+
+Rendering runs in a Web Worker on the client; renders above ~2.5MP get an instant reduced preview followed by the exact full-resolution frame. Limits: 8192px per side, 25MP. Binary assets are stored in MySQL (`viz_assets`, LONGBLOB) — **`max_allowed_packet` must be at least 64MB** (Azure Database for MySQL's default is sufficient). Engine unit tests: `npm test --workspace=apps/frontend`.
+
+## Procurement
+
+What a project needs to buy is tracked from first quote to delivered goods (`/procurement`).
+
+- **Vendors** — `studio_vendors`, shared with AI Studio: vendors named in imported WhatsApp chats appear automatically; contact, GSTIN and category are added here. A vendor with purchase orders cannot be deleted.
+- **Price lists** — `vendor_products`, with every price change kept in `vendor_product_prices`. Import a vendor's list from CSV (headers such as `vendor, name, brand, sku, category, unit, price, gst, hsn, lead_time_days`; common variants like `Item Name`, `Rate`, `UOM`, `GST %` are recognised). Re-importing matches on SKU (or name + brand), re-prices and keeps details the file leaves out. `source` is `designer` / `import` today and reserves `vendor` for products vendors list themselves.
+- **Requirements & comparison** — `procurement_items` (quantity, unit, client rate, needed-by). Quotes live in `studio_quotes` so prices from the catalog, typed in, or extracted by AI from WhatsApp/documents compete side by side, ranked by landed cost (GST included) with lowest / fastest / late / expired / unit-mismatch flags and the margin at each price. Approving one quote marks the item approved.
+- **Purchase orders** — `purchase_orders`, created from approved quotes (grouped per vendor under *Ready to order*) or by hand. GST totals reuse the invoice calculator (vendor GSTIN state vs place of supply). Delivery status follows received quantities per line; payments to the vendor are entered as a running total. The share link (`/procurement/orders/share/:token`, no login) lets the vendor view, download and **accept** the order; it hides payments and the project name, and stops working once the PO is cancelled.
+- **Status** — an item's status (`open → approved → ordered → received`) is derived from its quotes and the non-cancelled POs that reference it; only `cancelled` is set by hand.
+- **Summary** — per project: approved cost against budget, margin against client rates, savings versus the highest quote on each item, and amounts payable to vendors.
+
+| Method | Path | Description |
+|---|---|---|
+| GET / POST | `/procurement/vendors` | List (with product, quote and order totals) / create |
+| PATCH / DELETE | `/procurement/vendors/:id` | Update / delete (409 while the vendor has POs) |
+| GET / POST | `/procurement/products` | Catalog search (`q`, `vendorId`, `category`) / create |
+| POST | `/procurement/products/import` | Import parsed price-list rows |
+| GET | `/procurement/products/:id/prices` | Price history |
+| GET / POST | `/procurement/items` | Requirements with a quote digest / create |
+| GET / PATCH / DELETE | `/procurement/items/:id` | Comparison detail / update / delete (409 while on a PO) |
+| POST | `/procurement/items/:id/quotes` | Add a quote (from a product, a vendor, or a new vendor name) |
+| POST | `/procurement/items/:id/approve` · `/unapprove` | Choose / clear the winning quote |
+| GET · POST | `/procurement/items/unlinked-quotes` · `/:id/link-quotes` | AI-extracted quotes not yet on a requirement / attach them |
+| PATCH / DELETE | `/procurement/items/quotes/:quoteId` | Edit / remove a quote (extracted ones are only unlinked) |
+| GET / POST | `/procurement/orders` | List with totals / create |
+| GET / PATCH / DELETE | `/procurement/orders/:id` | Read / update (incl. cancel) / delete |
+| PATCH | `/procurement/orders/:id/receive` · `/payment` | Received quantities per line / total paid to the vendor |
+| POST | `/procurement/orders/:id/share` | Vendor share link |
+| GET · POST | `/procurement/orders/share/:token` · `/acknowledge` | **Public** vendor view / accept |
+| GET | `/procurement/summary?projectId=` | Project money summary |
 
 ## Environment Variables Reference
 

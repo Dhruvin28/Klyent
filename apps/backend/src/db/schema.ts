@@ -10,7 +10,14 @@ import {
   mysqlEnum,
   index,
   uniqueIndex,
+  customType,
 } from 'drizzle-orm/mysql-core'
+
+const longblob = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return 'longblob'
+  },
+})
 
 export const users = mysqlTable(
   'users',
@@ -26,6 +33,9 @@ export const users = mysqlTable(
     companyAddress: text('company_address'),
     companyWebsite: varchar('company_website', { length: 500 }),
     companyGstin: varchar('company_gstin', { length: 20 }),
+    passwordResetOtpHash: varchar('password_reset_otp_hash', { length: 255 }),
+    passwordResetOtpExpiresAt: timestamp('password_reset_otp_expires_at'),
+    studioIngestionKeyHash: varchar('studio_ingestion_key_hash', { length: 255 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
   },
@@ -179,6 +189,52 @@ export const freelanceProjects = mysqlTable(
   })
 )
 
+export const proposals = mysqlTable(
+  'proposals',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    proposalType: mysqlEnum('proposal_type', ['STANDARD', 'COST_BREAKUP']).notNull().default('STANDARD'),
+    proposalNumber: varchar('proposal_number', { length: 100 }).notNull(),
+    serviceType: varchar('service_type', { length: 200 }).notNull(),
+    date: varchar('date', { length: 10 }).notNull(),
+    validTill: varchar('valid_till', { length: 10 }).notNull(),
+    clientName: varchar('client_name', { length: 200 }).notNull(),
+    clientPhone: varchar('client_phone', { length: 50 }),
+    clientEmail: varchar('client_email', { length: 255 }),
+    clientAddress: text('client_address'),
+    siteName: varchar('site_name', { length: 200 }),
+    projectLocation: varchar('project_location', { length: 200 }),
+    projectType: varchar('project_type', { length: 100 }),
+    projectScope: varchar('project_scope', { length: 500 }),
+    aboutCompany: text('about_company'),
+    scopeOfWork: json('scope_of_work').$type<string[]>(),
+    feesDescription: varchar('fees_description', { length: 500 }).notNull(),
+    feesAmount: decimal('fees_amount', { precision: 15, scale: 2 }).notNull(),
+    feesAmountInWords: varchar('fees_amount_in_words', { length: 500 }),
+    feesNote: text('fees_note'),
+    paymentMilestones: json('payment_milestones').$type<{ milestone: number; description: string; percentage: number; amount: number }[]>(),
+    termsAndConditions: json('terms_and_conditions').$type<string[]>(),
+    // COST_BREAKUP proposals only:
+    materialSections: json('material_sections').$type<{ id: string; title: string; rateLabel: string; items: { srNo: number; description: string; rate?: string | null }[] }[]>(),
+    costBreakupItems: json('cost_breakup_items').$type<{ item: string; description: string; amount: number }[]>(),
+    status: mysqlEnum('status', ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED']).notNull().default('DRAFT'),
+    shareToken: varchar('share_token', { length: 128 }).unique(),
+    // Versioning: all versions of a proposal share the same rootProposalId
+    // (which equals the id of the very first version). version starts at 1.
+    version: int('version').notNull().default(1),
+    rootProposalId: varchar('root_proposal_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('proposals_user_id_idx').on(table.userId),
+    statusIdx: index('proposals_status_idx').on(table.status),
+    shareTokenIdx: uniqueIndex('proposals_share_token_idx').on(table.shareToken),
+    rootProposalIdIdx: index('proposals_root_proposal_id_idx').on(table.rootProposalId),
+  })
+)
+
 export const freelanceWorkLogs = mysqlTable(
   'freelance_work_logs',
   {
@@ -194,5 +250,801 @@ export const freelanceWorkLogs = mysqlTable(
   (table) => ({
     projectIdIdx: index('freelance_work_logs_project_id_idx').on(table.freelanceProjectId),
     dateIdx: index('freelance_work_logs_date_idx').on(table.date),
+  })
+)
+
+// ---------------------------------------------------------------------
+// Studio AI — WhatsApp project knowledge engine (ported from the
+// "Interior Bot" / DesignAI prototype). Namespaced with `studio_` /
+// `studio*` to avoid any collision with the freelancer-SaaS domain above.
+// Every table is scoped by `userId` since Klyent is multi-tenant.
+// ---------------------------------------------------------------------
+
+export const studioProjects = mysqlTable(
+  'studio_projects',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    name: varchar('name', { length: 200 }).notNull(),
+    clientName: varchar('client_name', { length: 200 }),
+    siteAddress: text('site_address'),
+    projectType: varchar('project_type', { length: 100 }),
+    budget: decimal('budget', { precision: 15, scale: 2 }),
+    timelineNotes: text('timeline_notes'),
+    status: mysqlEnum('status', ['ACTIVE', 'ON_HOLD', 'COMPLETED']).notNull().default('ACTIVE'),
+    // Optional link to an existing Klyent client — not required.
+    clientId: varchar('client_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_projects_user_id_idx').on(table.userId),
+    statusIdx: index('studio_projects_status_idx').on(table.status),
+  })
+)
+
+export const studioWhatsappGroups = mysqlTable(
+  'studio_whatsapp_groups',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    externalGroupId: varchar('external_group_id', { length: 255 }), // WhatsApp group id once a live bridge is wired up
+    name: varchar('name', { length: 255 }).notNull(),
+    groupType: varchar('group_type', { length: 50 }), // client | contractor | vendor | site | architect | internal
+    projectId: varchar('project_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_whatsapp_groups_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_whatsapp_groups_project_id_idx').on(table.projectId),
+    externalGroupIdIdx: uniqueIndex('studio_whatsapp_groups_external_id_idx').on(table.externalGroupId),
+    nameUserIdx: index('studio_whatsapp_groups_name_user_idx').on(table.name, table.userId),
+  })
+)
+
+export const studioMessages = mysqlTable(
+  'studio_messages',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    source: varchar('source', { length: 50 }).notNull().default('whatsapp'), // whatsapp | manual_import
+    groupId: varchar('group_id', { length: 128 }),
+    groupName: varchar('group_name', { length: 255 }), // denormalized, kept even if the group row is deleted
+    projectId: varchar('project_id', { length: 128 }),
+    projectConfidence: decimal('project_confidence', { precision: 4, scale: 3 }),
+    sender: varchar('sender', { length: 255 }),
+    senderId: varchar('sender_id', { length: 255 }),
+    messageType: varchar('message_type', { length: 20 }).notNull().default('text'), // text|image|pdf|docx|xlsx|voice|video|location|contact|link
+    content: text('content'),
+    replyToMessageId: varchar('reply_to_message_id', { length: 128 }),
+    externalMessageId: varchar('external_message_id', { length: 255 }), // WhatsApp message id, for idempotency
+    embedding: json('embedding').$type<number[]>(),
+    timestamp: timestamp('timestamp').notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_messages_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_messages_project_id_idx').on(table.projectId),
+    groupIdIdx: index('studio_messages_group_id_idx').on(table.groupId),
+    timestampIdx: index('studio_messages_timestamp_idx').on(table.timestamp),
+    externalIdIdx: uniqueIndex('studio_messages_external_id_idx').on(table.externalMessageId),
+  })
+)
+
+export const studioMessageMedia = mysqlTable(
+  'studio_message_media',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    messageId: varchar('message_id', { length: 128 }).notNull(),
+    fileName: varchar('file_name', { length: 500 }),
+    mimeType: varchar('mime_type', { length: 255 }),
+    storageUrl: text('storage_url').notNull(),
+    mediaKind: varchar('media_kind', { length: 20 }), // image | audio | video | document
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    messageIdIdx: index('studio_message_media_message_id_idx').on(table.messageId),
+  })
+)
+
+export const studioDocuments = mysqlTable(
+  'studio_documents',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    projectConfidence: decimal('project_confidence', { precision: 4, scale: 3 }),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    fileName: varchar('file_name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }),
+    storageUrl: text('storage_url').notNull(),
+    extractedText: text('extracted_text'),
+    documentType: varchar('document_type', { length: 50 }), // boq|quotation|invoice|purchase_order|floor_plan|...|other
+    ocrUsed: boolean('ocr_used').notNull().default(false),
+    uploadedBy: varchar('uploaded_by', { length: 255 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_documents_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_documents_project_id_idx').on(table.projectId),
+  })
+)
+
+export const studioDocumentChunks = mysqlTable(
+  'studio_document_chunks',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    documentId: varchar('document_id', { length: 128 }).notNull(),
+    chunkIndex: int('chunk_index').notNull(),
+    content: text('content').notNull(),
+    embedding: json('embedding').$type<number[]>(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    documentIdIdx: index('studio_document_chunks_document_id_idx').on(table.documentId),
+  })
+)
+
+export const studioDecisions = mysqlTable(
+  'studio_decisions',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    topic: varchar('topic', { length: 500 }).notNull(),
+    decision: text('decision').notNull(),
+    decisionBy: varchar('decision_by', { length: 255 }),
+    decisionDate: timestamp('decision_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    sourceDocumentId: varchar('source_document_id', { length: 128 }),
+    confidence: decimal('confidence', { precision: 4, scale: 3 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_decisions_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_decisions_project_id_idx').on(table.projectId),
+  })
+)
+
+export const studioTasks = mysqlTable(
+  'studio_tasks',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    title: varchar('title', { length: 500 }).notNull(),
+    description: text('description'),
+    assignedTo: varchar('assigned_to', { length: 255 }),
+    priority: mysqlEnum('priority', ['low', 'medium', 'high']).notNull().default('medium'),
+    status: mysqlEnum('status', ['open', 'in_progress', 'done', 'cancelled']).notNull().default('open'),
+    dueDate: timestamp('due_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_tasks_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_tasks_project_id_idx').on(table.projectId),
+    statusIdx: index('studio_tasks_status_idx').on(table.status),
+  })
+)
+
+export const studioDeadlines = mysqlTable(
+  'studio_deadlines',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    description: text('description').notNull(),
+    dueDate: timestamp('due_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_deadlines_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_deadlines_project_id_idx').on(table.projectId),
+  })
+)
+
+export const studioVendors = mysqlTable(
+  'studio_vendors',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    contactInfo: text('contact_info'),
+    // Procurement details. Vendors extracted from WhatsApp start with only a name.
+    phone: varchar('phone', { length: 50 }),
+    email: varchar('email', { length: 255 }),
+    gstin: varchar('gstin', { length: 20 }),
+    address: text('address'),
+    category: varchar('category', { length: 100 }),
+    notes: text('notes'),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_vendors_user_id_idx').on(table.userId),
+    nameUserIdx: uniqueIndex('studio_vendors_name_user_idx').on(table.name, table.userId),
+  })
+)
+
+export const studioMaterials = mysqlTable(
+  'studio_materials',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    category: varchar('category', { length: 100 }),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_materials_user_id_idx').on(table.userId),
+  })
+)
+
+export const studioQuotes = mysqlTable(
+  'studio_quotes',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    projectId: varchar('project_id', { length: 128 }),
+    vendorId: varchar('vendor_id', { length: 128 }),
+    materialId: varchar('material_id', { length: 128 }),
+    description: text('description'),
+    price: decimal('price', { precision: 15, scale: 2 }),
+    unit: varchar('unit', { length: 50 }), // sqft|piece|lumpsum|...
+    status: mysqlEnum('status', ['quoted', 'revised', 'approved', 'rejected']).notNull().default('quoted'),
+    quoteDate: timestamp('quote_date'),
+    sourceMessageId: varchar('source_message_id', { length: 128 }),
+    sourceDocumentId: varchar('source_document_id', { length: 128 }),
+    confidence: decimal('confidence', { precision: 4, scale: 3 }),
+    // Procurement: the requirement this quote competes for, and the catalog
+    // product it was taken from (if any). Extracted quotes start unlinked.
+    itemId: varchar('item_id', { length: 128 }),
+    productId: varchar('product_id', { length: 128 }),
+    gstRate: decimal('gst_rate', { precision: 5, scale: 2 }),
+    leadTimeDays: int('lead_time_days'),
+    validTill: varchar('valid_till', { length: 10 }),
+    notes: text('notes'),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('studio_quotes_user_id_idx').on(table.userId),
+    projectIdIdx: index('studio_quotes_project_id_idx').on(table.projectId),
+    itemIdIdx: index('studio_quotes_item_id_idx').on(table.itemId),
+  })
+)
+
+// ── Procurement ──
+// Vendors live in studio_vendors and quotes in studio_quotes, so prices the AI
+// pulls out of WhatsApp compete side by side with ones entered by hand.
+
+// A vendor's price list. Rows are owned by the designer today; `source` leaves
+// room for products listed by vendors themselves ('vendor') once they can sign in.
+export const vendorProducts = mysqlTable(
+  'vendor_products',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    vendorId: varchar('vendor_id', { length: 128 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    brand: varchar('brand', { length: 150 }),
+    sku: varchar('sku', { length: 100 }),
+    category: varchar('category', { length: 100 }),
+    unit: varchar('unit', { length: 30 }).notNull().default('Nos'),
+    price: decimal('price', { precision: 15, scale: 2 }).notNull(),
+    gstRate: decimal('gst_rate', { precision: 5, scale: 2 }).notNull().default('18'),
+    hsnCode: varchar('hsn_code', { length: 20 }),
+    description: text('description'),
+    leadTimeDays: int('lead_time_days'),
+    minOrderQty: decimal('min_order_qty', { precision: 15, scale: 3 }),
+    isActive: boolean('is_active').notNull().default(true),
+    source: mysqlEnum('source', ['designer', 'import', 'vendor']).notNull().default('designer'),
+    priceUpdatedAt: timestamp('price_updated_at').notNull().defaultNow(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('vendor_products_user_id_idx').on(table.userId),
+    vendorIdIdx: index('vendor_products_vendor_id_idx').on(table.vendorId),
+    categoryIdx: index('vendor_products_category_idx').on(table.category),
+  })
+)
+
+// Every price a product has had, so a quote can be judged against history.
+export const vendorProductPrices = mysqlTable(
+  'vendor_product_prices',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    productId: varchar('product_id', { length: 128 }).notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    price: decimal('price', { precision: 15, scale: 2 }).notNull(),
+    recordedAt: timestamp('recorded_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    productIdIdx: index('vendor_product_prices_product_id_idx').on(table.productId),
+  })
+)
+
+// Something a project needs to buy. Quotes are compared against it, one is
+// approved, and it is then ordered and received through purchase orders.
+export const procurementItems = mysqlTable(
+  'procurement_items',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }),
+    title: varchar('title', { length: 255 }).notNull(),
+    category: varchar('category', { length: 100 }),
+    specification: text('specification'),
+    quantity: decimal('quantity', { precision: 15, scale: 3 }).notNull().default('1'),
+    unit: varchar('unit', { length: 30 }).notNull().default('Nos'),
+    // What the client is charged per unit, for the margin on this item.
+    clientRate: decimal('client_rate', { precision: 15, scale: 2 }),
+    neededBy: varchar('needed_by', { length: 10 }),
+    // open → approved (a quote won) → ordered (on a PO) → received. Derived
+    // from quotes and POs except for 'cancelled', which the designer sets.
+    status: mysqlEnum('status', ['open', 'approved', 'ordered', 'received', 'cancelled']).notNull().default('open'),
+    approvedQuoteId: varchar('approved_quote_id', { length: 128 }),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('procurement_items_user_id_idx').on(table.userId),
+    projectIdIdx: index('procurement_items_project_id_idx').on(table.projectId),
+  })
+)
+
+export interface PurchaseOrderLine {
+  id: string
+  itemId?: string | null
+  productId?: string | null
+  description: string
+  hsnSac?: string | null
+  quantity: number
+  unit?: string | null
+  rate: number
+  discountPercent: number
+  taxRate: number
+  receivedQuantity: number
+}
+
+export const purchaseOrders = mysqlTable(
+  'purchase_orders',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    poNumber: varchar('po_number', { length: 100 }).notNull(),
+    poDate: varchar('po_date', { length: 10 }).notNull(),
+    expectedDelivery: varchar('expected_delivery', { length: 10 }),
+    projectId: varchar('project_id', { length: 128 }),
+
+    // Vendor details are snapshotted so editing the vendor never rewrites an issued PO.
+    vendorId: varchar('vendor_id', { length: 128 }).notNull(),
+    vendorName: varchar('vendor_name', { length: 255 }).notNull(),
+    vendorPhone: varchar('vendor_phone', { length: 50 }),
+    vendorEmail: varchar('vendor_email', { length: 255 }),
+    vendorAddress: text('vendor_address'),
+    vendorGstin: varchar('vendor_gstin', { length: 20 }),
+
+    deliveryAddress: text('delivery_address'),
+
+    // GST: the vendor is the supplier; place of supply is where goods are delivered.
+    supplierStateCode: varchar('supplier_state_code', { length: 2 }),
+    supplierStateName: varchar('supplier_state_name', { length: 100 }),
+    placeOfSupplyCode: varchar('place_of_supply_code', { length: 2 }),
+    placeOfSupplyName: varchar('place_of_supply_name', { length: 100 }),
+    isInterState: boolean('is_inter_state').notNull().default(false),
+
+    lineItems: json('line_items').$type<PurchaseOrderLine[]>(),
+
+    subtotal: decimal('subtotal', { precision: 15, scale: 2 }).notNull().default('0'),
+    discountTotal: decimal('discount_total', { precision: 15, scale: 2 }).notNull().default('0'),
+    taxableAmount: decimal('taxable_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    cgstAmount: decimal('cgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    sgstAmount: decimal('sgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    igstAmount: decimal('igst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalTax: decimal('total_tax', { precision: 15, scale: 2 }).notNull().default('0'),
+    roundOff: decimal('round_off', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    amountInWords: varchar('amount_in_words', { length: 500 }),
+
+    // Paid to the vendor so far, entered by hand like invoices.amountPaid.
+    amountPaid: decimal('amount_paid', { precision: 15, scale: 2 }).notNull().default('0'),
+
+    notes: text('notes'),
+    termsAndConditions: json('terms_and_conditions').$type<string[]>(),
+
+    // Delivery status. Follows the received quantities except DRAFT and CANCELLED.
+    status: mysqlEnum('status', ['DRAFT', 'SENT', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'])
+      .notNull()
+      .default('DRAFT'),
+    shareToken: varchar('share_token', { length: 128 }).unique(),
+    vendorAcknowledgedAt: timestamp('vendor_acknowledged_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('purchase_orders_user_id_idx').on(table.userId),
+    vendorIdIdx: index('purchase_orders_vendor_id_idx').on(table.vendorId),
+    projectIdIdx: index('purchase_orders_project_id_idx').on(table.projectId),
+    shareTokenIdx: uniqueIndex('purchase_orders_share_token_idx').on(table.shareToken),
+  })
+)
+
+export const invoices = mysqlTable(
+  'invoices',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    invoiceNumber: varchar('invoice_number', { length: 100 }).notNull(),
+    invoiceDate: varchar('invoice_date', { length: 10 }).notNull(),
+    dueDate: varchar('due_date', { length: 10 }).notNull(),
+
+    // Buyer ("Bill To"). clientId is optional — an invoice can be raised for a
+    // one-off buyer who is not a saved client. Details are snapshotted either
+    // way so editing a client later never rewrites an issued invoice.
+    clientId: varchar('client_id', { length: 128 }),
+    clientName: varchar('client_name', { length: 200 }).notNull(),
+    clientPhone: varchar('client_phone', { length: 50 }),
+    clientEmail: varchar('client_email', { length: 255 }),
+    clientAddress: text('client_address'),
+    clientGstin: varchar('client_gstin', { length: 20 }),
+
+    // GST place-of-supply. Same state code => CGST + SGST, different => IGST.
+    supplierStateCode: varchar('supplier_state_code', { length: 2 }),
+    supplierStateName: varchar('supplier_state_name', { length: 100 }),
+    placeOfSupplyCode: varchar('place_of_supply_code', { length: 2 }),
+    placeOfSupplyName: varchar('place_of_supply_name', { length: 100 }),
+    isInterState: boolean('is_inter_state').notNull().default(false),
+
+    lineItems: json('line_items').$type<
+      {
+        id: string
+        description: string
+        hsnSac?: string | null
+        quantity: number
+        unit?: string | null
+        rate: number
+        discountPercent: number
+        taxRate: number
+      }[]
+    >(),
+
+    // Server-computed totals, stored so an issued invoice is immutable history.
+    subtotal: decimal('subtotal', { precision: 15, scale: 2 }).notNull().default('0'),
+    discountTotal: decimal('discount_total', { precision: 15, scale: 2 }).notNull().default('0'),
+    taxableAmount: decimal('taxable_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    cgstAmount: decimal('cgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    sgstAmount: decimal('sgst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    igstAmount: decimal('igst_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalTax: decimal('total_tax', { precision: 15, scale: 2 }).notNull().default('0'),
+    roundOff: decimal('round_off', { precision: 15, scale: 2 }).notNull().default('0'),
+    totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).notNull().default('0'),
+    amountInWords: varchar('amount_in_words', { length: 500 }),
+
+    // Payments are not linked to invoices (see notes); amountPaid is recorded
+    // by hand so an invoice can still show a balance and a PART_PAID status.
+    amountPaid: decimal('amount_paid', { precision: 15, scale: 2 }).notNull().default('0'),
+
+    notes: text('notes'),
+    termsAndConditions: json('terms_and_conditions').$type<string[]>(),
+    bankName: varchar('bank_name', { length: 200 }),
+    bankAccountName: varchar('bank_account_name', { length: 200 }),
+    bankAccountNumber: varchar('bank_account_number', { length: 50 }),
+    bankIfsc: varchar('bank_ifsc', { length: 20 }),
+    upiId: varchar('upi_id', { length: 100 }),
+
+    status: mysqlEnum('status', ['DRAFT', 'SENT', 'PART_PAID', 'PAID', 'OVERDUE', 'CANCELLED'])
+      .notNull()
+      .default('DRAFT'),
+    shareToken: varchar('share_token', { length: 128 }).unique(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('invoices_user_id_idx').on(table.userId),
+    statusIdx: index('invoices_status_idx').on(table.status),
+    clientIdIdx: index('invoices_client_id_idx').on(table.clientId),
+    shareTokenIdx: uniqueIndex('invoices_share_token_idx').on(table.shareToken),
+    numberIdx: index('invoices_number_idx').on(table.invoiceNumber),
+  })
+)
+
+// ── AI chat (ChatGPT-style assistant with file/image input and image generation) ──
+
+export const aiSessions = mysqlTable(
+  'ai_sessions',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull().default('New chat'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdIdx: index('ai_sessions_user_id_idx').on(table.userId),
+  })
+)
+
+export const aiMessages = mysqlTable(
+  'ai_messages',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    sessionId: varchar('session_id', { length: 128 }).notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    role: mysqlEnum('role', ['user', 'assistant']).notNull(),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionIdx: index('ai_messages_session_idx').on(table.sessionId),
+  })
+)
+
+export const aiAttachments = mysqlTable(
+  'ai_attachments',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    messageId: varchar('message_id', { length: 128 }).notNull(),
+    sessionId: varchar('session_id', { length: 128 }).notNull(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    kind: mysqlEnum('kind', ['upload', 'generated']).notNull(),
+    name: varchar('name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }).notNull(),
+    size: int('size').notNull(),
+    data: longblob('data').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    messageIdx: index('ai_attachments_message_idx').on(table.messageId),
+    sessionIdx: index('ai_attachments_session_idx').on(table.sessionId),
+  })
+)
+
+// ── Material Replacement Visualizer ──
+// Binary assets (renders, masks, material textures, exports) live in viz_assets so
+// project state stays a small JSON document that references them by id.
+
+export const vizAssets = mysqlTable(
+  'viz_assets',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }),
+    materialId: varchar('material_id', { length: 128 }),
+    kind: mysqlEnum('kind', ['original', 'reference', 'thumbnail', 'mask', 'material_source', 'material_texture', 'export_image', 'export_mask', 'share_image']).notNull(),
+    name: varchar('name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }).notNull(),
+    size: int('size').notNull(),
+    width: int('width'),
+    height: int('height'),
+    sha256: varchar('sha256', { length: 64 }).notNull(),
+    data: longblob('data').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('viz_assets_user_idx').on(table.userId),
+    projectIdx: index('viz_assets_project_idx').on(table.projectId),
+    materialIdx: index('viz_assets_material_idx').on(table.materialId),
+  })
+)
+
+export const vizProjects = mysqlTable(
+  'viz_projects',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    clientId: varchar('client_id', { length: 128 }),
+    name: varchar('name', { length: 255 }).notNull(),
+    width: int('width').notNull(),
+    height: int('height').notNull(),
+    originalAssetId: varchar('original_asset_id', { length: 128 }).notNull(),
+    referenceAssetId: varchar('reference_asset_id', { length: 128 }).notNull(),
+    thumbnailAssetId: varchar('thumbnail_asset_id', { length: 128 }),
+    state: json('state').notNull(),
+    revision: int('revision').notNull().default(1),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('viz_projects_user_idx').on(table.userId),
+  })
+)
+
+export const vizMaterials = mysqlTable(
+  'viz_materials',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    kind: mysqlEnum('kind', ['texture', 'paint']).notNull(),
+    category: varchar('category', { length: 50 }).notNull(),
+    colorHex: varchar('color_hex', { length: 7 }),
+    sourceAssetId: varchar('source_asset_id', { length: 128 }),
+    textureAssetId: varchar('texture_asset_id', { length: 128 }),
+    textureWidth: int('texture_width'),
+    textureHeight: int('texture_height'),
+    widthMm: decimal('width_mm', { precision: 10, scale: 2 }),
+    heightMm: decimal('height_mm', { precision: 10, scale: 2 }),
+    brand: varchar('brand', { length: 255 }),
+    code: varchar('code', { length: 255 }),
+    notes: text('notes'),
+    settings: json('settings'),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('viz_materials_user_idx').on(table.userId),
+  })
+)
+
+export const vizExports = mysqlTable(
+  'viz_exports',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    optionId: varchar('option_id', { length: 128 }).notNull(),
+    optionName: varchar('option_name', { length: 255 }).notNull(),
+    imageAssetId: varchar('image_asset_id', { length: 128 }).notNull(),
+    maskAssetId: varchar('mask_asset_id', { length: 128 }).notNull(),
+    details: json('details').notNull(),
+    verification: json('verification').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    projectIdx: index('viz_exports_project_idx').on(table.projectId),
+  })
+)
+
+/** One option shown to the client on a share link, with its pre-rendered image. */
+export interface VizShareOption {
+  optionId: string
+  name: string
+  notes: string
+  imageAssetId: string
+  /** Optional cost summary shown to the client. */
+  total: number | null
+  areaSqft: number | null
+  materials: { name: string; brand: string | null; code: string | null; surfaces: string[] }[]
+}
+
+export interface VizShareDecision {
+  optionId: string
+  optionName: string
+  clientName: string
+  comment: string
+  decidedAt: string
+}
+
+export interface VizShareComment {
+  id: string
+  optionId: string | null
+  name: string
+  message: string
+  createdAt: string
+}
+
+// Client review links: a frozen set of rendered options the client can compare, comment
+// on and approve without an account.
+export const vizShares = mysqlTable(
+  'viz_shares',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    token: varchar('token', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    message: text('message'),
+    originalAssetId: varchar('original_asset_id', { length: 128 }).notNull(),
+    options: json('options').$type<VizShareOption[]>().notNull(),
+    showPrices: boolean('show_prices').notNull().default(false),
+    decision: json('decision').$type<VizShareDecision | null>(),
+    comments: json('comments').$type<VizShareComment[]>(),
+    expiresAt: timestamp('expires_at', { fsp: 3 }),
+    revokedAt: timestamp('revoked_at', { fsp: 3 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex('viz_shares_token_idx').on(table.token),
+    projectIdx: index('viz_shares_project_idx').on(table.projectId),
+  })
+)
+
+// ── 3D Designer ──
+// The floor plan (walls, openings, rooms, furniture, lighting, cameras) is one JSON
+// document per project; binary blobs (renders, panoramas, videos, GLB models,
+// underlays) live in design_assets and are referenced by id.
+
+export const designProjects = mysqlTable(
+  'design_projects',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    clientId: varchar('client_id', { length: 128 }),
+    name: varchar('name', { length: 255 }).notNull(),
+    plan: json('plan').notNull(),
+    revision: int('revision').notNull().default(1),
+    thumbnailAssetId: varchar('thumbnail_asset_id', { length: 128 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('design_projects_user_idx').on(table.userId),
+  })
+)
+
+export const designAssets = mysqlTable(
+  'design_assets',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }),
+    modelId: varchar('model_id', { length: 128 }),
+    kind: mysqlEnum('kind', ['thumbnail', 'underlay', 'render', 'panorama', 'video', 'model', 'model_thumb']).notNull(),
+    name: varchar('name', { length: 500 }).notNull(),
+    mimeType: varchar('mime_type', { length: 255 }).notNull(),
+    size: int('size').notNull(),
+    width: int('width'),
+    height: int('height'),
+    sha256: varchar('sha256', { length: 64 }).notNull(),
+    meta: json('meta'),
+    data: longblob('data').notNull(),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index('design_assets_user_idx').on(table.userId),
+    projectIdx: index('design_assets_project_idx').on(table.projectId),
+    modelIdx: index('design_assets_model_idx').on(table.modelId),
+  })
+)
+
+// User-level furniture catalog: uploaded GLBs and Poly Haven (CC0) imports.
+export const designModels = mysqlTable(
+  'design_models',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    category: varchar('category', { length: 100 }).notNull(),
+    source: mysqlEnum('source', ['upload', 'polyhaven']).notNull(),
+    sourceRef: varchar('source_ref', { length: 128 }),
+    glbAssetId: varchar('glb_asset_id', { length: 128 }).notNull(),
+    thumbAssetId: varchar('thumb_asset_id', { length: 128 }),
+    widthMm: decimal('width_mm', { precision: 10, scale: 2 }).notNull(),
+    depthMm: decimal('depth_mm', { precision: 10, scale: 2 }).notNull(),
+    heightMm: decimal('height_mm', { precision: 10, scale: 2 }).notNull(),
+    price: decimal('price', { precision: 15, scale: 2 }),
+    brand: varchar('brand', { length: 255 }),
+    license: varchar('license', { length: 255 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    userIdx: index('design_models_user_idx').on(table.userId),
+  })
+)
+
+// Virtual-tour links: a frozen list of renders/panoramas/videos a client can open without an account.
+export const designShares = mysqlTable(
+  'design_shares',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    userId: varchar('user_id', { length: 128 }).notNull(),
+    projectId: varchar('project_id', { length: 128 }).notNull(),
+    token: varchar('token', { length: 128 }).notNull(),
+    title: varchar('title', { length: 255 }).notNull(),
+    message: text('message'),
+    renderIds: json('render_ids').$type<string[]>().notNull(),
+    expiresAt: timestamp('expires_at', { fsp: 3 }),
+    revokedAt: timestamp('revoked_at', { fsp: 3 }),
+    createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().onUpdateNow(),
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex('design_shares_token_idx').on(table.token),
+    projectIdx: index('design_shares_project_idx').on(table.projectId),
   })
 )

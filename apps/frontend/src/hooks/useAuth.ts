@@ -32,3 +32,22 @@ export function useMe() {
     enabled: isAuthenticated,
   })
 }
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (email: string) => authApi.forgotPassword(email),
+  })
+}
+
+export function useVerifyOtp() {
+  return useMutation({
+    mutationFn: ({ email, otp }: { email: string; otp: string }) => authApi.verifyOtp(email, otp),
+  })
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: ({ resetToken, newPassword }: { resetToken: string; newPassword: string }) =>
+      authApi.resetPassword(resetToken, newPassword),
+  })
+}

@@ -45,6 +45,7 @@ jobs:
           cp -r apps/backend/dist deploy/apps/backend/dist
           cp -r apps/frontend/dist deploy/apps/frontend/dist
           cp package.json deploy/package.json
+          cp apps/backend/startup.sh deploy/apps/backend/startup.sh
           cp apps/backend/package.json deploy/apps/backend/package.json
           # Copy backend's own node_modules if they exist (non-hoisted workspace deps)
           if [ -d apps/backend/node_modules ]; then

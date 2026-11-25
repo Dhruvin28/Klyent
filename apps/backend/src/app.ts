@@ -14,14 +14,37 @@ import fileRoutes from './routes/files'
 import dashboardRoutes from './routes/dashboard'
 import activityRoutes from './routes/activity'
 import freelanceRoutes from './routes/freelance'
+import proposalRoutes from './routes/proposals'
+import invoiceRoutes from './routes/invoices'
+import procurementRoutes from './routes/procurement'
+import aiRoutes from './routes/ai'
+import visualizerRoutes from './routes/visualizer'
+import visualizerPublicRoutes from './routes/visualizer/public'
+import designerRoutes from './routes/designer'
+import designerPublicRoutes from './routes/designer/public'
+import interiorRoutes from './routes/interior'
+import studioProjectRoutes from './routes/studio/projects'
+import studioGroupRoutes from './routes/studio/groups'
+import studioMessageRoutes from './routes/studio/messages'
+import studioDocumentRoutes from './routes/studio/documents'
+import studioAskRoutes from './routes/studio/ask'
+import studioSearchRoutes from './routes/studio/search'
+import studioTaskRoutes from './routes/studio/tasks'
+import studioDecisionRoutes from './routes/studio/decisions'
+import studioQuoteRoutes from './routes/studio/quotes'
+import studioSummaryRoutes from './routes/studio/summary'
+import studioImportRoutes from './routes/studio/import'
+import studioSettingsRoutes from './routes/studio/settings'
+import studioWebhookRoutes from './routes/studio/webhook'
 
 // Augment FastifyRequest to include JWT user payload
 declare module '@fastify/jwt' {
   interface FastifyJWT {
     payload: {
       sub: string
-      email: string
-      role: string
+      email?: string
+      role?: string
+      purpose?: string
     }
     user: {
       sub: string
@@ -95,6 +118,36 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' })
   await app.register(activityRoutes, { prefix: '/api/activity' })
   await app.register(freelanceRoutes, { prefix: '/api/freelance' })
+  await app.register(proposalRoutes, { prefix: '/api/proposals' })
+  await app.register(invoiceRoutes, { prefix: '/api/invoices' })
+  await app.register(procurementRoutes, { prefix: '/api/procurement' })
+
+  await app.register(aiRoutes, { prefix: '/api/ai' })
+  await app.register(visualizerRoutes, { prefix: '/api/visualizer' })
+  // Client review links (no login)
+  await app.register(visualizerPublicRoutes, { prefix: '/api/visualizer-public' })
+
+  // 3D Designer — floor plans, furniture catalog, renders and virtual-tour links
+  await app.register(designerRoutes, { prefix: '/api/designer' })
+  await app.register(designerPublicRoutes, { prefix: '/api/designer-public' })
+
+  // Interior 3D — dimension-preserving drawings → validated 3D scene → multi-view renders
+  await app.register(interiorRoutes, { prefix: '/api/interior' })
+
+  // Studio AI — WhatsApp project knowledge engine
+  await app.register(studioProjectRoutes, { prefix: '/api/studio/projects' })
+  await app.register(studioGroupRoutes, { prefix: '/api/studio/groups' })
+  await app.register(studioMessageRoutes, { prefix: '/api/studio/messages' })
+  await app.register(studioDocumentRoutes, { prefix: '/api/studio/documents' })
+  await app.register(studioAskRoutes, { prefix: '/api/studio/ask' })
+  await app.register(studioSearchRoutes, { prefix: '/api/studio/search' })
+  await app.register(studioTaskRoutes, { prefix: '/api/studio/tasks' })
+  await app.register(studioDecisionRoutes, { prefix: '/api/studio/decisions' })
+  await app.register(studioQuoteRoutes, { prefix: '/api/studio/quotes' })
+  await app.register(studioSummaryRoutes, { prefix: '/api/studio/summary' })
+  await app.register(studioImportRoutes, { prefix: '/api/studio/import' })
+  await app.register(studioSettingsRoutes, { prefix: '/api/studio/settings' })
+  await app.register(studioWebhookRoutes, { prefix: '/webhooks/studio-whatsapp' })
 
   // Serve frontend static files in production
   const frontendDist = path.join(__dirname, '../../frontend/dist')

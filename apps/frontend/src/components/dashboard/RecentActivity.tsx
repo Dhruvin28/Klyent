@@ -70,7 +70,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {activities.map((activity) => {
+            {activities.slice(0, 5).map((activity) => {
               const config = activityConfig[activity.type]
               const Icon = config.icon
               const initials = activity.user?.name

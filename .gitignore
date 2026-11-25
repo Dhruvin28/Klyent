@@ -10,6 +10,9 @@ apps/frontend/node_modules/
 # ─── Build outputs ────────────────────────────────────────────────────────────
 dist/
 build/
+# This is source code, not generated output.
+!apps/backend/src/interior/build/
+!apps/backend/src/interior/build/*.ts
 out/
 *.js.map
 *.tsbuildinfo

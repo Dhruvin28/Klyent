@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { IndianRupee, Clock, TrendingUp, Briefcase } from 'lucide-react'
+import { IndianRupee, Clock, TrendingUp, Briefcase, Wallet } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { RevenueChart } from '@/components/dashboard/RevenueChart'
 import { ClientGrowthChart } from '@/components/dashboard/ClientGrowthChart'
 import { RecentActivity } from '@/components/dashboard/RecentActivity'
 import { DashboardDetailModal, type DashboardTile } from '@/components/dashboard/DashboardDetailModal'
+import { ExportReportButton } from '@/components/dashboard/ExportReportButton'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -23,8 +24,8 @@ export function DashboardPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
                 <Skeleton className="h-4 w-24" />
@@ -48,6 +49,15 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Page header — export lives here so it is reachable with or without a company banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Dashboard</h2>
+          <p className="text-sm text-muted-foreground">Your clients, payments and revenue at a glance</p>
+        </div>
+        <ExportReportButton />
+      </div>
+
       {/* Company banner */}
       {hasCompany && (
         <div className="flex items-center gap-4 rounded-xl border bg-card px-5 py-4">
@@ -76,7 +86,13 @@ export function DashboardPage() {
       )}
 
       {/* Client stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          icon={Wallet}
+          label="Total Billed"
+          value={formatCurrency((stats?.totalRevenue ?? 0) + (stats?.pendingPayments ?? 0))}
+          iconClassName="bg-blue-100 dark:bg-blue-900/30"
+        />
         <StatsCard
           icon={IndianRupee}
           label="Total Revenue"

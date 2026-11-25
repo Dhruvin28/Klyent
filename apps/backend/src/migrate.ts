@@ -120,6 +120,39 @@ const CREATE_STATEMENTS = [
     INDEX \`freelance_projects_status_idx\` (\`status\`)
   )`,
 
+  `CREATE TABLE IF NOT EXISTS \`proposals\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`proposal_number\` VARCHAR(100) NOT NULL,
+    \`service_type\` VARCHAR(200) NOT NULL DEFAULT 'Services',
+    \`date\` VARCHAR(10) NOT NULL,
+    \`valid_till\` VARCHAR(10) NOT NULL,
+    \`client_name\` VARCHAR(200) NOT NULL,
+    \`client_phone\` VARCHAR(50),
+    \`client_email\` VARCHAR(255),
+    \`client_address\` TEXT,
+    \`site_name\` VARCHAR(200),
+    \`project_location\` VARCHAR(200),
+    \`project_type\` VARCHAR(100),
+    \`project_scope\` VARCHAR(500),
+    \`about_company\` TEXT,
+    \`scope_of_work\` JSON,
+    \`fees_description\` VARCHAR(500) NOT NULL,
+    \`fees_amount\` DECIMAL(15,2) NOT NULL,
+    \`fees_amount_in_words\` VARCHAR(500),
+    \`fees_note\` TEXT,
+    \`payment_milestones\` JSON,
+    \`terms_and_conditions\` JSON,
+    \`status\` ENUM('DRAFT','SENT','ACCEPTED','REJECTED') NOT NULL DEFAULT 'DRAFT',
+    \`share_token\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`proposals_share_token_idx\` (\`share_token\`),
+    INDEX \`proposals_user_id_idx\` (\`user_id\`),
+    INDEX \`proposals_status_idx\` (\`status\`)
+  )`,
+
   `CREATE TABLE IF NOT EXISTS \`freelance_work_logs\` (
     \`id\` VARCHAR(128) NOT NULL,
     \`freelance_project_id\` VARCHAR(128) NOT NULL,
@@ -133,6 +166,752 @@ const CREATE_STATEMENTS = [
     INDEX \`freelance_work_logs_project_id_idx\` (\`freelance_project_id\`),
     INDEX \`freelance_work_logs_date_idx\` (\`date\`)
   )`,
+
+  `CREATE TABLE IF NOT EXISTS \`invoices\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`invoice_number\` VARCHAR(100) NOT NULL,
+    \`invoice_date\` VARCHAR(10) NOT NULL,
+    \`due_date\` VARCHAR(10) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`client_name\` VARCHAR(200) NOT NULL,
+    \`client_phone\` VARCHAR(50),
+    \`client_email\` VARCHAR(255),
+    \`client_address\` TEXT,
+    \`client_gstin\` VARCHAR(20),
+    \`supplier_state_code\` VARCHAR(2),
+    \`supplier_state_name\` VARCHAR(100),
+    \`place_of_supply_code\` VARCHAR(2),
+    \`place_of_supply_name\` VARCHAR(100),
+    \`is_inter_state\` TINYINT(1) NOT NULL DEFAULT 0,
+    \`line_items\` JSON,
+    \`subtotal\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`discount_total\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`taxable_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`cgst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`sgst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`igst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`total_tax\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`round_off\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`total_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`amount_in_words\` VARCHAR(500),
+    \`amount_paid\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`notes\` TEXT,
+    \`terms_and_conditions\` JSON,
+    \`bank_name\` VARCHAR(200),
+    \`bank_account_name\` VARCHAR(200),
+    \`bank_account_number\` VARCHAR(50),
+    \`bank_ifsc\` VARCHAR(20),
+    \`upi_id\` VARCHAR(100),
+    \`status\` ENUM('DRAFT','SENT','PART_PAID','PAID','OVERDUE','CANCELLED') NOT NULL DEFAULT 'DRAFT',
+    \`share_token\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`invoices_share_token_idx\` (\`share_token\`),
+    INDEX \`invoices_user_id_idx\` (\`user_id\`),
+    INDEX \`invoices_status_idx\` (\`status\`),
+    INDEX \`invoices_client_id_idx\` (\`client_id\`),
+    INDEX \`invoices_number_idx\` (\`invoice_number\`)
+  )`,
+  // -----------------------------------------------------------------
+  // Studio AI — WhatsApp project knowledge engine
+  // -----------------------------------------------------------------
+
+  `CREATE TABLE IF NOT EXISTS \`studio_projects\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(200) NOT NULL,
+    \`client_name\` VARCHAR(200),
+    \`site_address\` TEXT,
+    \`project_type\` VARCHAR(100),
+    \`budget\` DECIMAL(15,2),
+    \`timeline_notes\` TEXT,
+    \`status\` ENUM('ACTIVE','ON_HOLD','COMPLETED') NOT NULL DEFAULT 'ACTIVE',
+    \`client_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_projects_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_projects_status_idx\` (\`status\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_whatsapp_groups\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`external_group_id\` VARCHAR(255),
+    \`name\` VARCHAR(255) NOT NULL,
+    \`group_type\` VARCHAR(50),
+    \`project_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`studio_whatsapp_groups_external_id_idx\` (\`external_group_id\`),
+    INDEX \`studio_whatsapp_groups_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_whatsapp_groups_project_id_idx\` (\`project_id\`),
+    INDEX \`studio_whatsapp_groups_name_user_idx\` (\`name\`, \`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_messages\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`source\` VARCHAR(50) NOT NULL DEFAULT 'whatsapp',
+    \`group_id\` VARCHAR(128),
+    \`group_name\` VARCHAR(255),
+    \`project_id\` VARCHAR(128),
+    \`project_confidence\` DECIMAL(4,3),
+    \`sender\` VARCHAR(255),
+    \`sender_id\` VARCHAR(255),
+    \`message_type\` VARCHAR(20) NOT NULL DEFAULT 'text',
+    \`content\` TEXT,
+    \`reply_to_message_id\` VARCHAR(128),
+    \`external_message_id\` VARCHAR(255),
+    \`embedding\` JSON,
+    \`timestamp\` TIMESTAMP NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`studio_messages_external_id_idx\` (\`external_message_id\`),
+    INDEX \`studio_messages_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_messages_project_id_idx\` (\`project_id\`),
+    INDEX \`studio_messages_group_id_idx\` (\`group_id\`),
+    INDEX \`studio_messages_timestamp_idx\` (\`timestamp\`),
+    FULLTEXT INDEX \`studio_messages_content_fts\` (\`content\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_message_media\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`message_id\` VARCHAR(128) NOT NULL,
+    \`file_name\` VARCHAR(500),
+    \`mime_type\` VARCHAR(255),
+    \`storage_url\` TEXT NOT NULL,
+    \`media_kind\` VARCHAR(20),
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_message_media_message_id_idx\` (\`message_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_documents\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`project_confidence\` DECIMAL(4,3),
+    \`source_message_id\` VARCHAR(128),
+    \`file_name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255),
+    \`storage_url\` TEXT NOT NULL,
+    \`extracted_text\` TEXT,
+    \`document_type\` VARCHAR(50),
+    \`ocr_used\` TINYINT(1) NOT NULL DEFAULT 0,
+    \`uploaded_by\` VARCHAR(255),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_documents_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_documents_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_document_chunks\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`document_id\` VARCHAR(128) NOT NULL,
+    \`chunk_index\` INT NOT NULL,
+    \`content\` TEXT NOT NULL,
+    \`embedding\` JSON,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_document_chunks_document_id_idx\` (\`document_id\`),
+    FULLTEXT INDEX \`studio_document_chunks_content_fts\` (\`content\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_decisions\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`topic\` VARCHAR(500) NOT NULL,
+    \`decision\` TEXT NOT NULL,
+    \`decision_by\` VARCHAR(255),
+    \`decision_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`source_document_id\` VARCHAR(128),
+    \`confidence\` DECIMAL(4,3),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_decisions_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_decisions_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_tasks\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`title\` VARCHAR(500) NOT NULL,
+    \`description\` TEXT,
+    \`assigned_to\` VARCHAR(255),
+    \`priority\` ENUM('low','medium','high') NOT NULL DEFAULT 'medium',
+    \`status\` ENUM('open','in_progress','done','cancelled') NOT NULL DEFAULT 'open',
+    \`due_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_tasks_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_tasks_project_id_idx\` (\`project_id\`),
+    INDEX \`studio_tasks_status_idx\` (\`status\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_deadlines\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`description\` TEXT NOT NULL,
+    \`due_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_deadlines_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_deadlines_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_vendors\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`contact_info\` TEXT,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`studio_vendors_name_user_idx\` (\`name\`, \`user_id\`),
+    INDEX \`studio_vendors_user_id_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_materials\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`category\` VARCHAR(100),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_materials_user_id_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`studio_quotes\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`vendor_id\` VARCHAR(128),
+    \`material_id\` VARCHAR(128),
+    \`description\` TEXT,
+    \`price\` DECIMAL(15,2),
+    \`unit\` VARCHAR(50),
+    \`status\` ENUM('quoted','revised','approved','rejected') NOT NULL DEFAULT 'quoted',
+    \`quote_date\` TIMESTAMP NULL,
+    \`source_message_id\` VARCHAR(128),
+    \`source_document_id\` VARCHAR(128),
+    \`confidence\` DECIMAL(4,3),
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`studio_quotes_user_id_idx\` (\`user_id\`),
+    INDEX \`studio_quotes_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`ai_sessions\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`title\` VARCHAR(255) NOT NULL DEFAULT 'New chat',
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`ai_sessions_user_id_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`ai_messages\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`session_id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`role\` ENUM('user','assistant') NOT NULL,
+    \`content\` MEDIUMTEXT NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`ai_messages_session_idx\` (\`session_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`ai_attachments\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`message_id\` VARCHAR(128) NOT NULL,
+    \`session_id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`kind\` ENUM('upload','generated') NOT NULL,
+    \`name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255) NOT NULL,
+    \`size\` INT NOT NULL,
+    \`data\` LONGBLOB NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`ai_attachments_message_idx\` (\`message_id\`),
+    INDEX \`ai_attachments_session_idx\` (\`session_id\`)
+  )`,
+
+  // ── Material Replacement Visualizer ──
+  `CREATE TABLE IF NOT EXISTS \`viz_assets\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`material_id\` VARCHAR(128),
+    \`kind\` ENUM('original','reference','thumbnail','mask','material_source','material_texture','export_image','export_mask','share_image') NOT NULL,
+    \`name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255) NOT NULL,
+    \`size\` INT NOT NULL,
+    \`width\` INT,
+    \`height\` INT,
+    \`sha256\` VARCHAR(64) NOT NULL,
+    \`data\` LONGBLOB NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_assets_user_idx\` (\`user_id\`),
+    INDEX \`viz_assets_project_idx\` (\`project_id\`),
+    INDEX \`viz_assets_material_idx\` (\`material_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_projects\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`name\` VARCHAR(255) NOT NULL,
+    \`width\` INT NOT NULL,
+    \`height\` INT NOT NULL,
+    \`original_asset_id\` VARCHAR(128) NOT NULL,
+    \`reference_asset_id\` VARCHAR(128) NOT NULL,
+    \`thumbnail_asset_id\` VARCHAR(128),
+    \`state\` JSON NOT NULL,
+    \`revision\` INT NOT NULL DEFAULT 1,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_projects_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_materials\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`kind\` ENUM('texture','paint') NOT NULL,
+    \`category\` VARCHAR(50) NOT NULL,
+    \`color_hex\` VARCHAR(7),
+    \`source_asset_id\` VARCHAR(128),
+    \`texture_asset_id\` VARCHAR(128),
+    \`texture_width\` INT,
+    \`texture_height\` INT,
+    \`width_mm\` DECIMAL(10,2),
+    \`height_mm\` DECIMAL(10,2),
+    \`brand\` VARCHAR(255),
+    \`code\` VARCHAR(255),
+    \`notes\` TEXT,
+    \`settings\` JSON,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_materials_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_exports\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128) NOT NULL,
+    \`option_id\` VARCHAR(128) NOT NULL,
+    \`option_name\` VARCHAR(255) NOT NULL,
+    \`image_asset_id\` VARCHAR(128) NOT NULL,
+    \`mask_asset_id\` VARCHAR(128) NOT NULL,
+    \`details\` JSON NOT NULL,
+    \`verification\` JSON NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`viz_exports_project_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`viz_shares\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128) NOT NULL,
+    \`token\` VARCHAR(128) NOT NULL,
+    \`title\` VARCHAR(255) NOT NULL,
+    \`message\` TEXT,
+    \`original_asset_id\` VARCHAR(128) NOT NULL,
+    \`options\` JSON NOT NULL,
+    \`show_prices\` BOOLEAN NOT NULL DEFAULT FALSE,
+    \`decision\` JSON,
+    \`comments\` JSON,
+    \`expires_at\` TIMESTAMP(3) NULL,
+    \`revoked_at\` TIMESTAMP(3) NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`viz_shares_token_idx\` (\`token\`),
+    INDEX \`viz_shares_project_idx\` (\`project_id\`)
+  )`,
+
+  // ── 3D Designer ──
+  `CREATE TABLE IF NOT EXISTS \`design_projects\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`name\` VARCHAR(255) NOT NULL,
+    \`plan\` JSON NOT NULL,
+    \`revision\` INT NOT NULL DEFAULT 1,
+    \`thumbnail_asset_id\` VARCHAR(128),
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`design_projects_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`design_assets\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`model_id\` VARCHAR(128),
+    \`kind\` ENUM('thumbnail','underlay','render','panorama','video','model','model_thumb') NOT NULL,
+    \`name\` VARCHAR(500) NOT NULL,
+    \`mime_type\` VARCHAR(255) NOT NULL,
+    \`size\` INT NOT NULL,
+    \`width\` INT,
+    \`height\` INT,
+    \`sha256\` VARCHAR(64) NOT NULL,
+    \`meta\` JSON,
+    \`data\` LONGBLOB NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`design_assets_user_idx\` (\`user_id\`),
+    INDEX \`design_assets_project_idx\` (\`project_id\`),
+    INDEX \`design_assets_model_idx\` (\`model_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`design_models\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`category\` VARCHAR(100) NOT NULL,
+    \`source\` ENUM('upload','polyhaven') NOT NULL,
+    \`source_ref\` VARCHAR(128),
+    \`glb_asset_id\` VARCHAR(128) NOT NULL,
+    \`thumb_asset_id\` VARCHAR(128),
+    \`width_mm\` DECIMAL(10,2) NOT NULL,
+    \`depth_mm\` DECIMAL(10,2) NOT NULL,
+    \`height_mm\` DECIMAL(10,2) NOT NULL,
+    \`price\` DECIMAL(15,2),
+    \`brand\` VARCHAR(255),
+    \`license\` VARCHAR(255),
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`design_models_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`design_shares\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128) NOT NULL,
+    \`token\` VARCHAR(128) NOT NULL,
+    \`title\` VARCHAR(255) NOT NULL,
+    \`message\` TEXT,
+    \`render_ids\` JSON NOT NULL,
+    \`expires_at\` TIMESTAMP(3) NULL,
+    \`revoked_at\` TIMESTAMP(3) NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`design_shares_token_idx\` (\`token\`),
+    INDEX \`design_shares_project_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`vendor_products\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`vendor_id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(255) NOT NULL,
+    \`brand\` VARCHAR(150),
+    \`sku\` VARCHAR(100),
+    \`category\` VARCHAR(100),
+    \`unit\` VARCHAR(30) NOT NULL DEFAULT 'Nos',
+    \`price\` DECIMAL(15,2) NOT NULL,
+    \`gst_rate\` DECIMAL(5,2) NOT NULL DEFAULT 18,
+    \`hsn_code\` VARCHAR(20),
+    \`description\` TEXT,
+    \`lead_time_days\` INT,
+    \`min_order_qty\` DECIMAL(15,3),
+    \`is_active\` BOOLEAN NOT NULL DEFAULT TRUE,
+    \`source\` ENUM('designer','import','vendor') NOT NULL DEFAULT 'designer',
+    \`price_updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`vendor_products_user_id_idx\` (\`user_id\`),
+    INDEX \`vendor_products_vendor_id_idx\` (\`vendor_id\`),
+    INDEX \`vendor_products_category_idx\` (\`category\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`vendor_product_prices\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`product_id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`price\` DECIMAL(15,2) NOT NULL,
+    \`recorded_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`vendor_product_prices_product_id_idx\` (\`product_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`procurement_items\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`project_id\` VARCHAR(128),
+    \`title\` VARCHAR(255) NOT NULL,
+    \`category\` VARCHAR(100),
+    \`specification\` TEXT,
+    \`quantity\` DECIMAL(15,3) NOT NULL DEFAULT 1,
+    \`unit\` VARCHAR(30) NOT NULL DEFAULT 'Nos',
+    \`client_rate\` DECIMAL(15,2),
+    \`needed_by\` VARCHAR(10),
+    \`status\` ENUM('open','approved','ordered','received','cancelled') NOT NULL DEFAULT 'open',
+    \`approved_quote_id\` VARCHAR(128),
+    \`notes\` TEXT,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    INDEX \`procurement_items_user_id_idx\` (\`user_id\`),
+    INDEX \`procurement_items_project_id_idx\` (\`project_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`purchase_orders\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`po_number\` VARCHAR(100) NOT NULL,
+    \`po_date\` VARCHAR(10) NOT NULL,
+    \`expected_delivery\` VARCHAR(10),
+    \`project_id\` VARCHAR(128),
+    \`vendor_id\` VARCHAR(128) NOT NULL,
+    \`vendor_name\` VARCHAR(255) NOT NULL,
+    \`vendor_phone\` VARCHAR(50),
+    \`vendor_email\` VARCHAR(255),
+    \`vendor_address\` TEXT,
+    \`vendor_gstin\` VARCHAR(20),
+    \`delivery_address\` TEXT,
+    \`supplier_state_code\` VARCHAR(2),
+    \`supplier_state_name\` VARCHAR(100),
+    \`place_of_supply_code\` VARCHAR(2),
+    \`place_of_supply_name\` VARCHAR(100),
+    \`is_inter_state\` BOOLEAN NOT NULL DEFAULT FALSE,
+    \`line_items\` JSON,
+    \`subtotal\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`discount_total\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`taxable_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`cgst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`sgst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`igst_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`total_tax\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`round_off\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`total_amount\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`amount_in_words\` VARCHAR(500),
+    \`amount_paid\` DECIMAL(15,2) NOT NULL DEFAULT 0,
+    \`notes\` TEXT,
+    \`terms_and_conditions\` JSON,
+    \`status\` ENUM('DRAFT','SENT','PARTIALLY_RECEIVED','RECEIVED','CANCELLED') NOT NULL DEFAULT 'DRAFT',
+    \`share_token\` VARCHAR(128),
+    \`vendor_acknowledged_at\` TIMESTAMP NULL,
+    \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`purchase_orders_share_token_idx\` (\`share_token\`),
+    INDEX \`purchase_orders_user_id_idx\` (\`user_id\`),
+    INDEX \`purchase_orders_vendor_id_idx\` (\`vendor_id\`),
+    INDEX \`purchase_orders_project_id_idx\` (\`project_id\`)
+  )`,
+
+  // ── Interior 3D: dimension-preserving drawing → 3D reconstruction ──
+  // Drawings and derived pages are evidence; revisions hold the canonical scene;
+  // decisions/approvals are append-only. Binary data stays in LONGBLOBs like the
+  // rest of the app, so max_allowed_packet must exceed config.interior.maxUploadBytes.
+  `CREATE TABLE IF NOT EXISTS \`int_workspaces\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`client_id\` VARCHAR(128),
+    \`name\` VARCHAR(255) NOT NULL,
+    \`mode\` ENUM('strict','draft') NOT NULL DEFAULT 'strict',
+    \`reference_page_id\` VARCHAR(128),
+    \`latest_revision_id\` VARCHAR(128),
+    \`approved_revision_id\` VARCHAR(128),
+    \`design_project_id\` VARCHAR(128),
+    \`designer_pushed_revision\` INT,
+    \`auto_build\` TINYINT(1) NOT NULL DEFAULT 1,
+    \`lock_version\` INT NOT NULL DEFAULT 0,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`int_workspaces_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_documents\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`name\` VARCHAR(500) NOT NULL,
+    \`kind\` ENUM('pdf','image','dxf') NOT NULL,
+    \`mime_type\` VARCHAR(255) NOT NULL,
+    \`size\` INT NOT NULL,
+    \`sha256\` VARCHAR(64) NOT NULL,
+    \`revision_label\` VARCHAR(64),
+    \`page_count\` INT NOT NULL DEFAULT 0,
+    \`status\` VARCHAR(24) NOT NULL DEFAULT 'uploaded',
+    \`preflight\` JSON,
+    \`error\` TEXT,
+    \`data\` LONGBLOB NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`int_documents_workspace_idx\` (\`workspace_id\`),
+    INDEX \`int_documents_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_pages\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`document_id\` VARCHAR(128) NOT NULL,
+    \`page_index\` INT NOT NULL,
+    \`width\` INT NOT NULL,
+    \`height\` INT NOT NULL,
+    \`preview_width\` INT NOT NULL,
+    \`preview_height\` INT NOT NULL,
+    \`role\` VARCHAR(32),
+    \`suggested_role\` VARCHAR(32),
+    \`title\` VARCHAR(255),
+    \`status\` VARCHAR(24) NOT NULL DEFAULT 'extracted',
+    \`extraction\` JSON NOT NULL,
+    \`vectors\` LONGBLOB,
+    \`image\` LONGBLOB NOT NULL,
+    \`preview\` LONGBLOB NOT NULL,
+    \`interpretation\` JSON,
+    \`interpretation_key\` VARCHAR(64),
+    \`interpretation_meta\` JSON,
+    \`calibration\` JSON,
+    \`assignment\` JSON,
+    \`registration\` JSON,
+    \`error\` TEXT,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`int_pages_document_page_idx\` (\`document_id\`, \`page_index\`),
+    INDEX \`int_pages_workspace_idx\` (\`workspace_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_jobs\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`type\` VARCHAR(32) NOT NULL,
+    \`target_id\` VARCHAR(128) NOT NULL,
+    \`idempotency_key\` VARCHAR(191) NOT NULL,
+    \`status\` VARCHAR(24) NOT NULL DEFAULT 'queued',
+    \`attempt\` INT NOT NULL DEFAULT 0,
+    \`max_attempts\` INT NOT NULL DEFAULT 3,
+    \`lease_token\` VARCHAR(64),
+    \`lease_expires_at\` TIMESTAMP(3) NULL,
+    \`available_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`cancel_requested_at\` TIMESTAMP(3) NULL,
+    \`progress\` JSON,
+    \`input\` JSON,
+    \`result\` JSON,
+    \`error_code\` VARCHAR(64),
+    \`error\` TEXT,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`started_at\` TIMESTAMP(3) NULL,
+    \`finished_at\` TIMESTAMP(3) NULL,
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`int_jobs_idem_idx\` (\`user_id\`, \`idempotency_key\`),
+    INDEX \`int_jobs_status_idx\` (\`status\`, \`available_at\`),
+    INDEX \`int_jobs_workspace_idx\` (\`workspace_id\`, \`created_at\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_revisions\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`revision_no\` INT NOT NULL,
+    \`parent_revision_id\` VARCHAR(128),
+    \`origin\` VARCHAR(24) NOT NULL,
+    \`status\` ENUM('draft','frozen') NOT NULL DEFAULT 'draft',
+    \`schema_version\` VARCHAR(32) NOT NULL,
+    \`scene\` JSON NOT NULL,
+    \`scene_hash\` CHAR(64),
+    \`summary\` JSON,
+    \`lock_version\` INT NOT NULL DEFAULT 0,
+    \`sealed_at\` TIMESTAMP(3) NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    UNIQUE INDEX \`int_revisions_no_idx\` (\`workspace_id\`, \`revision_no\`),
+    INDEX \`int_revisions_user_idx\` (\`user_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_validation_runs\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`revision_id\` VARCHAR(128) NOT NULL,
+    \`scene_hash\` CHAR(64) NOT NULL,
+    \`validator_version\` VARCHAR(32) NOT NULL,
+    \`policy\` JSON NOT NULL,
+    \`status\` VARCHAR(24) NOT NULL,
+    \`summary\` JSON NOT NULL,
+    \`checks\` JSON NOT NULL,
+    \`issues\` JSON NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`int_validation_runs_revision_idx\` (\`revision_id\`, \`created_at\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_decisions\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`revision_id\` VARCHAR(128),
+    \`kind\` VARCHAR(48) NOT NULL,
+    \`target\` JSON,
+    \`before_json\` JSON,
+    \`after_json\` JSON,
+    \`command\` JSON,
+    \`rationale\` TEXT,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`int_decisions_workspace_idx\` (\`workspace_id\`, \`created_at\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_approvals\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`revision_id\` VARCHAR(128) NOT NULL,
+    \`validation_run_id\` VARCHAR(128) NOT NULL,
+    \`scene_hash\` CHAR(64) NOT NULL,
+    \`mode\` ENUM('final','draft') NOT NULL,
+    \`note\` TEXT,
+    \`approved_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`int_approvals_revision_idx\` (\`revision_id\`)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS \`int_render_sets\` (
+    \`id\` VARCHAR(128) NOT NULL,
+    \`user_id\` VARCHAR(128) NOT NULL,
+    \`workspace_id\` VARCHAR(128) NOT NULL,
+    \`revision_id\` VARCHAR(128) NOT NULL,
+    \`approval_id\` VARCHAR(128),
+    \`design_project_id\` VARCHAR(128) NOT NULL,
+    \`manifest\` JSON NOT NULL,
+    \`manifest_hash\` CHAR(64) NOT NULL,
+    \`status\` VARCHAR(24) NOT NULL DEFAULT 'queued',
+    \`outputs\` JSON NOT NULL,
+    \`created_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updated_at\` TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (\`id\`),
+    INDEX \`int_render_sets_workspace_idx\` (\`workspace_id\`, \`created_at\`)
+  )`,
+]
+
+// ENUM columns that gained values: [table, column, full definition, value that must exist]
+const ENUM_UPDATES: [string, string, string, string][] = [
+  ['viz_assets', 'kind', "ENUM('original','reference','thumbnail','mask','material_source','material_texture','export_image','export_mask','share_image') NOT NULL", 'share_image'],
 ]
 
 // Columns to add to existing tables: [table, column, definition]
@@ -143,8 +922,33 @@ const ALTER_COLUMNS: [string, string, string][] = [
   ['users', 'company_address',  'TEXT'],
   ['users', 'company_website',  'VARCHAR(500)'],
   ['users', 'company_gstin',    'VARCHAR(20)'],
+  ['users', 'studio_ingestion_key_hash', 'VARCHAR(255)'],
+  ['users', 'password_reset_otp_hash', 'VARCHAR(255)'],
+  ['users', 'password_reset_otp_expires_at', 'TIMESTAMP NULL'],
   ['payments', 'freelance_project_id', 'VARCHAR(128)'],
   ['files',    'freelance_project_id', 'VARCHAR(128)'],
+  ['proposals', 'proposal_type', "ENUM('STANDARD','COST_BREAKUP') NOT NULL DEFAULT 'STANDARD'"],
+  ['proposals', 'material_sections', 'JSON'],
+  ['proposals', 'cost_breakup_items', 'JSON'],
+  ['proposals', 'version', 'INT NOT NULL DEFAULT 1'],
+  ['proposals', 'root_proposal_id', 'VARCHAR(128)'],
+  ['studio_vendors', 'phone',    'VARCHAR(50)'],
+  ['studio_vendors', 'email',    'VARCHAR(255)'],
+  ['studio_vendors', 'gstin',    'VARCHAR(20)'],
+  ['studio_vendors', 'address',  'TEXT'],
+  ['studio_vendors', 'category', 'VARCHAR(100)'],
+  ['studio_vendors', 'notes',    'TEXT'],
+  ['studio_quotes', 'item_id',        'VARCHAR(128)'],
+  ['studio_quotes', 'product_id',     'VARCHAR(128)'],
+  ['studio_quotes', 'gst_rate',       'DECIMAL(5,2)'],
+  ['studio_quotes', 'lead_time_days', 'INT'],
+  ['studio_quotes', 'valid_till',     'VARCHAR(10)'],
+  ['studio_quotes', 'notes',          'TEXT'],
+]
+
+// Indexes to add to existing tables: [table, index name, column list]
+const ADD_INDEXES: [string, string, string][] = [
+  ['studio_quotes', 'studio_quotes_item_id_idx', '`item_id`'],
 ]
 
 // Columns to make nullable if currently NOT NULL: [table, column, varchar-definition]
@@ -184,6 +988,18 @@ export async function runMigrations() {
     }
   }
 
+  for (const [table, name, columns] of ADD_INDEXES) {
+    const [rows] = await connection.execute(
+      `SELECT COUNT(*) AS cnt FROM information_schema.statistics
+       WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`,
+      [table, name]
+    ) as [{ cnt: number }[], unknown]
+    if (rows[0].cnt === 0) {
+      await connection.execute(`ALTER TABLE \`${table}\` ADD INDEX \`${name}\` (${columns})`)
+      console.log(`[migrate] Added index ${table}.${name}`)
+    }
+  }
+
   // Make columns nullable if they are currently NOT NULL
   for (const [table, column, definition] of MAKE_NULLABLE) {
     const [rows] = await connection.execute(
@@ -194,6 +1010,19 @@ export async function runMigrations() {
     if (rows[0]?.IS_NULLABLE === 'NO') {
       await connection.execute(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`)
       console.log(`[migrate] Made ${table}.${column} nullable`)
+    }
+  }
+
+  // Widen ENUMs (only when the new value is missing, so this is a no-op once applied)
+  for (const [table, column, definition, value] of ENUM_UPDATES) {
+    const [rows] = await connection.execute(
+      `SELECT COLUMN_TYPE AS t FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+      [table, column]
+    ) as [{ t: string }[], unknown]
+    if (rows[0] && !rows[0].t.includes(`'${value}'`)) {
+      await connection.execute(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`)
+      console.log(`[migrate] Extended ${table}.${column} with '${value}'`)
     }
   }
 

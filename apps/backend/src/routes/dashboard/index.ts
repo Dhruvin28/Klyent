@@ -2,9 +2,13 @@ import { FastifyInstance } from 'fastify'
 import { eq, and, gte, inArray, count, sql, isNotNull } from 'drizzle-orm'
 import { db, clients, payments, activityLogs, users, freelanceProjects, freelanceWorkLogs } from '../../db'
 import { authenticate } from '../../middleware/authenticate'
+import reportRoutes from './report'
 
 export default async function dashboardRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
+
+  // Full business report data, behind the same auth hook.
+  await app.register(reportRoutes)
 
   // GET /api/dashboard/stats
   app.get('/stats', async (request, reply) => {
