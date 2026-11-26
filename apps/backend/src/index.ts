@@ -1,4 +1,7 @@
-import 'dotenv/config'
+import path from 'path'
+import dotenv from 'dotenv'
+// Resolve .env relative to apps/backend (works from src/ or dist/, any cwd)
+dotenv.config({ path: path.resolve(__dirname, '../.env') })
 import { buildApp } from './app'
 import { config } from './config'
 import { runMigrations } from './migrate'
